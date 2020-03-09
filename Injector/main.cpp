@@ -1,0 +1,322 @@
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
+#include <memory>
+#include <vector>
+
+#ifdef UNICODE
+#undef UNICODE
+#endif
+#define WIN32_LEAN_AND_MEAN
+
+#include <Windows.h>
+//
+#include <TlHelp32.h>
+
+namespace marvin {
+namespace memory {
+
+uint32_t ReadU32(HANDLE handle, size_t address) {
+  uint32_t value = 0;
+  SIZE_T num_read;
+
+  if (ReadProcessMemory(handle, (LPVOID)address, &value, sizeof(uint32_t),
+                        &num_read)) {
+    return value;
+  }
+
+  return 0;
+}
+
+std::string ReadString(HANDLE handle, size_t address, size_t len) {
+  std::string value;
+  SIZE_T read;
+
+  value.resize(len);
+
+  if (ReadProcessMemory(handle, (LPVOID)address, &value[0], len, &read)) {
+    return value;
+  }
+
+  return "";
+}
+
+}  // namespace memory
+
+class Process {
+ public:
+  Process(DWORD process_id)
+      : process_handle_(nullptr), process_id_(process_id) {}
+  ~Process() {
+    if (process_handle_) {
+      CloseHandle(process_handle_);
+    }
+  }
+
+  Process(const Process& other) = delete;
+  Process& operator=(const Process& other) = delete;
+
+  std::size_t GetModuleBase(const char* module_name) {
+    HANDLE hSnapshot = CreateToolhelp32Snapshot(
+        TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, process_id_);
+    MODULEENTRY32 me = {0};
+
+    me.dwSize = sizeof(me);
+
+    if (hSnapshot == INVALID_HANDLE_VALUE) {
+      return 0;
+    }
+
+    std::size_t module_base = 0;
+    BOOL bModule = Module32First(hSnapshot, &me);
+    while (bModule) {
+      if (strcmp(module_name, me.szModule) == 0) {
+        module_base = reinterpret_cast<std::size_t>(me.modBaseAddr);
+        break;
+      }
+
+      bModule = Module32Next(hSnapshot, &me);
+    }
+
+    CloseHandle(hSnapshot);
+    return module_base;
+  }
+
+  bool HasModule(const char* module_name) {
+    HANDLE hSnapshot = CreateToolhelp32Snapshot(
+        TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, process_id_);
+    MODULEENTRY32 me = {0};
+
+    me.dwSize = sizeof(me);
+
+    if (hSnapshot == INVALID_HANDLE_VALUE) {
+      return false;
+    }
+
+    bool has_module = false;
+    BOOL bModule = Module32First(hSnapshot, &me);
+
+    while (bModule) {
+      if (strcmp(module_name, me.szModule) == 0) {
+        has_module = true;
+        break;
+      }
+
+      bModule = Module32Next(hSnapshot, &me);
+    }
+
+    CloseHandle(hSnapshot);
+
+    return has_module;
+  }
+
+  bool InjectModule(const std::string& module_path) {
+    bool injected = false;
+    HMODULE hModule = GetModuleHandleA("kernel32.dll");
+    HANDLE hProcess = GetHandle();
+
+    if (!hModule) {
+      std::cout << "hModule null\n";
+    }
+
+    if (!hProcess) {
+      std::cout << "Failed to get handle\n";
+    }
+
+    if (hProcess && hModule) {
+      // Get the address to LoadLibrary in kernel32.dll
+      LPVOID load_addr = (LPVOID)GetProcAddress(hModule, "LoadLibraryA");
+      // Allocate some memory in Continuum's process to store the path to the
+      // DLL to load.
+      LPVOID path_addr =
+          VirtualAllocEx(hProcess, NULL, module_path.size(),
+                         MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+
+      if (!load_addr) {
+        std::cout << "bad load addr\n";
+      }
+
+      if (!path_addr) {
+        std::cout << "Bad allocation\n";
+      }
+
+      if (load_addr && path_addr) {
+        // Write the path to the DLL to load into the recently allocated area.
+        if (WriteProcessMemory(hProcess, path_addr, module_path.data(),
+                               module_path.size(), NULL)) {
+          // Start a remote thread in the Continuum process that immediately
+          // kicks off the load.
+          injected = CreateRemoteThread(hProcess, NULL, NULL,
+                                        (LPTHREAD_START_ROUTINE)load_addr,
+                                        path_addr, 0, NULL) != NULL;
+        } else {
+          std::cout << "Bad WriteProcessMemory\n";
+        }
+      }
+    }
+
+    return injected;
+  }
+
+  HANDLE GetHandle() {
+    if (process_handle_) {
+      return process_handle_;
+    }
+
+#if 0
+    const DWORD desired_access =
+        PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION |
+        PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ;
+#endif
+    const DWORD desired_access = PROCESS_ALL_ACCESS;
+
+    process_handle_ = OpenProcess(desired_access, FALSE, process_id_);
+
+    return process_handle_;
+  }
+
+  DWORD GetId() { return process_id_; }
+
+ private:
+  HANDLE process_handle_;
+  DWORD process_id_;
+};
+
+bool GetDebugPrivileges() {
+  HANDLE token = nullptr;
+  bool success = false;
+
+  if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &token)) {
+    TOKEN_PRIVILEGES privileges;
+
+    LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &privileges.Privileges[0].Luid);
+    privileges.PrivilegeCount = 1;
+    privileges.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+    if (AdjustTokenPrivileges(token, FALSE, &privileges,
+                              sizeof(TOKEN_PRIVILEGES), 0, 0))
+      success = true;
+
+    CloseHandle(token);
+  }
+
+  return success;
+}
+
+std::string GetWorkingDirectory() {
+  std::string directory;
+
+  directory.resize(GetCurrentDirectory(0, NULL));
+
+  GetCurrentDirectory(directory.size(), &directory[0]);
+
+  return directory.substr(0, directory.size() - 1);
+}
+
+std::vector<DWORD> GetProcessIds(const char* exe_file) {
+  std::vector<DWORD> pids;
+  PROCESSENTRY32 pe32 = {};
+
+  pe32.dwSize = sizeof(PROCESSENTRY32);
+
+  HANDLE hTool32 = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
+  BOOL bProcess = Process32First(hTool32, &pe32);
+
+  while (bProcess) {
+    if (strcmp(pe32.szExeFile, "Continuum.exe") == 0) {
+      pids.push_back(pe32.th32ProcessID);
+    }
+
+    bProcess = Process32Next(hTool32, &pe32);
+  }
+
+  CloseHandle(hTool32);
+
+  return pids;
+}
+
+class GameProxy {
+ public:
+  virtual ~GameProxy() {}
+  virtual std::string GetName() const = 0;
+};
+
+class ContinuumGameProxy : public GameProxy {
+ public:
+  ContinuumGameProxy(std::unique_ptr<Process> process)
+      : process_(std::move(process)) {}
+
+  std::string GetName() const override {
+    const size_t ProfileStructSize = 2860;
+    DWORD pid = process_->GetId();
+    HANDLE handle = process_->GetHandle();
+    size_t menu_base = process_->GetModuleBase("menu040.dll");
+
+    if (menu_base == 0) {
+      return "";
+    }
+
+    uint16_t profile_index =
+        memory::ReadU32(handle, menu_base + 0x47FA0) & 0xFFFF;
+    size_t addr = memory::ReadU32(handle, menu_base + 0x47A38) + 0x15;
+
+    if (addr == 0) {
+      return "";
+    }
+
+    addr += profile_index * ProfileStructSize;
+
+    std::string name = memory::ReadString(handle, addr, 23);
+
+    name = name.substr(0, strlen(name.c_str()));
+
+    return name;
+  }
+
+  Process& GetProcess() { return *process_; }
+
+ private:
+  std::unique_ptr<Process> process_;
+};
+
+}  // namespace marvin
+
+int main(int argc, char* argv[]) {
+  if (!marvin::GetDebugPrivileges()) {
+    std::cerr << "Failed to get debug privileges. Try running as Administrator."
+              << std::endl;
+    return EXIT_FAILURE;
+  }
+
+  auto continuum_pids = marvin::GetProcessIds("Continuum.exe");
+
+  if (continuum_pids.empty()) {
+    std::cout << "No Continuum.exe processes found." << std::endl;
+  }
+
+  std::string inject_path = marvin::GetWorkingDirectory() + "\\Marvin.dll";
+
+  for (auto pid : continuum_pids) {
+    auto game =
+        marvin::ContinuumGameProxy(std::make_unique<marvin::Process>(pid));
+
+    std::string name = game.GetName();
+
+    std::cout << pid << " (" << name << ") - ";
+
+    auto& process = game.GetProcess();
+
+    if (process.HasModule("Marvin.dll")) {
+      std::cout << "Already loaded." << std::endl;
+    } else {
+      if (process.InjectModule(inject_path)) {
+        std::cout << "Loaded" << std::endl;
+      } else {
+        std::cout << "Failed to load" << std::endl;
+      }
+    }
+  }
+
+  return EXIT_SUCCESS;
+}
