@@ -15,6 +15,10 @@ uint32_t ExeProcess::ReadU32(std::size_t address) const {
   return *(uint32_t*)address;
 }
 
+int32_t ExeProcess::ReadI32(std::size_t address) const {
+  return *(int32_t*)address;
+}
+
 bool ExeProcess::WriteU32(std::size_t address, uint32_t value) {
   uint32_t* data = (uint32_t*)address;
   *data = value;
@@ -30,10 +34,14 @@ std::string ExeProcess::ReadString(std::size_t address,
   value.resize(length);
 
   for (std::size_t i = 0; i < length; ++i) {
+    if (data[i] == 0) {
+      length = i;
+      break;
+    }
     value[i] = data[i];
   }
 
-  return value;
+  return value.substr(0, length);
 }
 
 std::size_t ExeProcess::GetModuleBase(const char* module_name) {

@@ -2,15 +2,32 @@
 
 #include <vector>
 
+#include "../Map.h"
+
 namespace marvin {
 
 ContinuumGameProxy::ContinuumGameProxy() {
   module_base_continuum_ = process_.GetModuleBase("Continuum.exe");
   module_base_menu_ = process_.GetModuleBase("menu040.dll");
+  player_id_ = 0xFFFF;
 
   game_addr_ = process_.ReadU32(module_base_continuum_ + 0xC1AFC);
 
   position_data_ = (uint32_t*)(game_addr_ + 0x126BC);
+
+  // TODO: Either find this from memory or pass it in through config
+  std::string path = GetServerFolder() + "\\jun2018.lvl";
+
+  map_ = Map::Load(path);
+
+  FetchPlayers();
+
+  for (auto& player : players_) {
+    if (player.name == GetName()) {
+      player_id_ = player.id;
+      player_ = &player;
+    }
+  }
 }
 
 void ContinuumGameProxy::Update(float dt) { FetchPlayers(); }
@@ -46,9 +63,9 @@ void ContinuumGameProxy::FetchPlayers() {
         process_.ReadU32(player_addr + kPosOffset + 4) / 1000.0f / 16.0f;
 
     player.velocity.x =
-        process_.ReadU32(player_addr + kVelocityOffset) / 10.0f / 16.0f;
-    player.velocity.x =
-        process_.ReadU32(player_addr + kVelocityOffset + 4) / 10.0f / 16.0f;
+        process_.ReadI32(player_addr + kVelocityOffset) / 10.0f / 16.0f;
+    player.velocity.y =
+        process_.ReadI32(player_addr + kVelocityOffset + 4) / 10.0f / 16.0f;
 
     player.id =
         static_cast<uint16_t>(process_.ReadU32(player_addr + kIdOffset));
@@ -66,7 +83,17 @@ void ContinuumGameProxy::FetchPlayers() {
     player.name = process_.ReadString(player_addr + kNameOffset, 23);
 
     players_.emplace_back(player);
+
+    if (player.id == player_id_) {
+      player_ = &players_.back();
+    }
   }
+}
+
+const ClientSettings& ContinuumGameProxy::GetSettings() const {
+  std::size_t addr = game_addr_ + 0x127EC + 0x1AE70;  // 0x2D65C
+
+  return *reinterpret_cast<ClientSettings*>(addr);
 }
 
 std::string ContinuumGameProxy::GetName() const {
@@ -91,13 +118,24 @@ std::string ContinuumGameProxy::GetName() const {
 
 Vector2f ContinuumGameProxy::GetPosition() const {
   float x = (*position_data_) / 16.0f;
-  float y = (*position_data_) / 16.0f;
+  float y = (*(position_data_ + 1)) / 16.0f;
 
   return Vector2f(x, y);
 }
 
 const std::vector<Player>& ContinuumGameProxy::GetPlayers() const {
   return players_;
+}
+
+const Map& ContinuumGameProxy::GetMap() const { return *map_; }
+const Player& ContinuumGameProxy::GetPlayer() const { return *player_; }
+
+// TODO: Find level data or level name in memory
+std::string ContinuumGameProxy::GetServerFolder() const {
+  std::size_t folder_addr = *(uint32_t*)(game_addr_ + 0x127ec + 0x5a3c) + 0x10D;
+  std::string server_folder = process_.ReadString(folder_addr, 256);
+
+  return server_folder;
 }
 
 void ContinuumGameProxy::SetWindowFocus() {

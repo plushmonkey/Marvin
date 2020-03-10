@@ -18,6 +18,7 @@ class ExeProcess {
   ExeProcess& operator=(const ExeProcess& other) = delete;
 
   uint32_t ReadU32(std::size_t address) const;
+  int32_t ReadI32(std::size_t address) const;
   std::string ReadString(std::size_t address, std::size_t length) const;
 
   bool WriteU32(std::size_t address, uint32_t value);

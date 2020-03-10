@@ -282,6 +282,40 @@ class ContinuumGameProxy : public GameProxy {
 
 }  // namespace marvin
 
+DWORD SelectPid(const std::vector<DWORD>& pids) {
+  for (std::size_t i = 0; i < pids.size(); ++i) {
+    auto pid = pids[i];
+    auto game =
+      marvin::ContinuumGameProxy(std::make_unique<marvin::Process>(pid));
+
+    std::string name = game.GetName();
+
+    std::cout << (i + 1) << ": " << pid << " (" << name << ")";
+
+    auto& process = game.GetProcess();
+
+    if (process.HasModule("Marvin.dll")) {
+      std::cout << " - Already loaded." << std::endl;
+    } else {
+      std::cout << std::endl;
+    }
+  }
+
+  std::cout << "> ";
+
+  std::string input;
+  std::cin >> input;
+
+  auto selection = strtol(input.c_str(), nullptr, 10);
+
+  if (selection < 1 || selection > pids.size()) {
+    std::cerr << "Invalid selection." << std::endl;
+    return 0;
+  }
+
+  return pids[selection - 1];
+}
+
 int main(int argc, char* argv[]) {
   if (!marvin::GetDebugPrivileges()) {
     std::cerr << "Failed to get debug privileges. Try running as Administrator."
@@ -293,29 +327,28 @@ int main(int argc, char* argv[]) {
 
   if (continuum_pids.empty()) {
     std::cout << "No Continuum.exe processes found." << std::endl;
+    return 0;
   }
 
   std::string inject_path = marvin::GetWorkingDirectory() + "\\Marvin.dll";
 
-  for (auto pid : continuum_pids) {
-    auto game =
-        marvin::ContinuumGameProxy(std::make_unique<marvin::Process>(pid));
+  DWORD pid = SelectPid(continuum_pids);
 
-    std::string name = game.GetName();
+  if (pid == 0) {
+    return EXIT_FAILURE;
+  }
 
-    std::cout << pid << " (" << name << ") - ";
+  auto process = std::make_unique<marvin::Process>(pid);
 
-    auto& process = game.GetProcess();
+  if (process->HasModule("Marvin.dll")) {
+    std::cerr << "Invalid selection. " << pid << " already has Marvin loaded." << std::endl;
+    return EXIT_FAILURE;
+  }
 
-    if (process.HasModule("Marvin.dll")) {
-      std::cout << "Already loaded." << std::endl;
-    } else {
-      if (process.InjectModule(inject_path)) {
-        std::cout << "Loaded" << std::endl;
-      } else {
-        std::cout << "Failed to load" << std::endl;
-      }
-    }
+  if (process->InjectModule(inject_path)) {
+    std::cout << "Successfully loaded." << std::endl;
+  } else {
+    std::cerr << "Failed to load" << std::endl;
   }
 
   return EXIT_SUCCESS;

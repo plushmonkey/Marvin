@@ -97,12 +97,12 @@ class Vector2f {
 
   inline float LengthSq() const { return x * x + y * y; }
 
-  inline float Distance(const Vector2f& other) {
+  inline float Distance(const Vector2f& other) const {
     Vector2f to_other = other - *this;
     return to_other.Length();
   }
 
-  inline float DistanceSq(const Vector2f& other) {
+  inline float DistanceSq(const Vector2f& other) const {
     Vector2f to_other = other - *this;
     return to_other.LengthSq();
   }
@@ -142,7 +142,7 @@ inline Vector2f Normalize(const Vector2f& v) {
   return result;
 }
 
-inline Vector2f Perpendicular(const Vector2f& v) { return Vector2f(v.y, -v.x); }
+inline Vector2f Perpendicular(const Vector2f& v) { return Vector2f(-v.y, v.x); }
 
 inline bool operator<(const Vector2f& lhs, const Vector2f& rhs) noexcept {
   if (lhs.y < rhs.y) {

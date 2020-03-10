@@ -145,16 +145,20 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Map.cpp" />
     <ClCompile Include="platform\ContinuumGameProxy.cpp" />
     <ClCompile Include="platform\ExeProcess.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ClientSettings.h" />
+    <ClInclude Include="Map.h" />
     <ClInclude Include="platform\ContinuumGameProxy.h" />
     <ClInclude Include="platform\ExeProcess.h" />
     <ClInclude Include="GameProxy.h" />
     <ClInclude Include="platform\Platform.h" />
     <ClInclude Include="Player.h" />
+    <ClInclude Include="Types.h" />
     <ClInclude Include="Vector2f.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
