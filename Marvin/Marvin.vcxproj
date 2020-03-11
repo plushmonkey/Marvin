@@ -145,19 +145,32 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Bot.cpp" />
+    <ClCompile Include="KeyController.cpp" />
     <ClCompile Include="Map.cpp" />
+    <ClCompile Include="path\NodeProcessor.cpp" />
+    <ClCompile Include="path\Pathfinder.cpp" />
     <ClCompile Include="platform\ContinuumGameProxy.cpp" />
     <ClCompile Include="platform\ExeProcess.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="RayCaster.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Bot.h" />
     <ClInclude Include="ClientSettings.h" />
+    <ClInclude Include="Hash.h" />
+    <ClInclude Include="KeyController.h" />
     <ClInclude Include="Map.h" />
+    <ClInclude Include="path\Node.h" />
+    <ClInclude Include="path\NodeProcessor.h" />
+    <ClInclude Include="path\Path.h" />
+    <ClInclude Include="path\Pathfinder.h" />
     <ClInclude Include="platform\ContinuumGameProxy.h" />
     <ClInclude Include="platform\ExeProcess.h" />
     <ClInclude Include="GameProxy.h" />
     <ClInclude Include="platform\Platform.h" />
     <ClInclude Include="Player.h" />
+    <ClInclude Include="RayCaster.h" />
     <ClInclude Include="Types.h" />
     <ClInclude Include="Vector2f.h" />
   </ItemGroup>

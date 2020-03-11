@@ -30,7 +30,13 @@ ContinuumGameProxy::ContinuumGameProxy() {
   }
 }
 
-void ContinuumGameProxy::Update(float dt) { FetchPlayers(); }
+void ContinuumGameProxy::Update(float dt) {
+  // Continuum stops processing input when it loses focus, so update the memory
+  // to make it think it always has focus.
+  SetWindowFocus();
+
+  FetchPlayers();
+}
 
 void ContinuumGameProxy::FetchPlayers() {
   const std::size_t kPosOffset = 0x04;
