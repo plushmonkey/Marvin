@@ -26,6 +26,8 @@ class Bot {
                     float distance);
   void Move(const Vector2f& target, float target_distance);
 
+  void SmoothPath();
+
   std::unique_ptr<GameProxy> game_;
   std::unique_ptr<path::Pathfinder> pathfinder_;
   std::vector<Vector2f> path_;

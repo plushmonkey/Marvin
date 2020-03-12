@@ -83,6 +83,145 @@ void Bot::Update(float dt) {
   UpdateProofOfConcept();
 }
 
+Vector2f ClosestWall(const Map& map, Vector2f pos, int search) {
+  double closest_dist = std::numeric_limits<double>::max();
+  Vector2f closest;
+
+  Vector2f base(std::floor(pos.x), std::floor(pos.y));
+  for (int y = -search; y <= search; ++y) {
+    for (int x = -search; x <= search; ++x) {
+      Vector2f current = base + Vector2f(x, y);
+
+      if (!map.IsSolid((unsigned short)current.x, (unsigned short)current.y)) {
+        continue;
+      }
+
+      double dist = BoxPointDistance(current, Vector2f(1, 1), pos);
+
+      if (dist < closest_dist) {
+        closest_dist = dist;
+        closest = current;
+      }
+    }
+  }
+
+  return closest;
+}
+
+bool IsPassablePath(const Map& map, Vector2f from, Vector2f to, double radius) {
+  const Vector2f direction = Normalize(to - from);
+  const Vector2f side = Perpendicular(direction) * (radius * 0.3);
+  const double distance = from.Distance(to);
+
+  CastResult cast_center = RayCast(map, from, direction, distance);
+  //CastResult cast_side1 = RayCast(level, from + side, direction, distance);
+  //CastResult cast_side2 = RayCast(level, from - side, direction, distance);
+
+  return !cast_center.hit; //&& !cast_side1.hit && !cast_side2.hit;
+}
+
+void Bot::SmoothPath() {
+  // How far away it should try to push the path from walls
+  double push_distance = 2.1;
+
+  int ship = game_->GetPlayer().ship;
+  float radius = game_->GetSettings().ShipSettings[ship].Radius / 16.0f;
+
+  std::vector<Vector2f> result;
+
+  result.resize(path_.size());
+
+  for (std::size_t i = 0; i < path_.size(); ++i) {
+    Vector2f current = path_[i] + Vector2f(0.5, 0.5);
+    Vector2f closest = ClosestWall(game_->GetMap(), current, (int)std::ceil(push_distance + 1));
+    Vector2f new_pos = current;
+
+#if 1
+    if (closest != Vector2f(0, 0)) {
+      // Attempt to push the path outward from the wall
+      // TODO: iterative box penetration push
+
+      Vector2f center = closest + Vector2f(0.5, 0.5);
+      CastResult cast_result = RayCast(game_->GetMap(), current, center, push_distance + 1);
+      Vector2f hit = cast_result.hit ? cast_result.position : center;
+
+      //double dist = BoxPointDistance(closest, Vec2(1, 1), current);
+      double dist = hit.Distance(current);
+      double force = push_distance - dist;
+
+      if (force < 0) force = 0;
+
+      new_pos = current + Normalize(current - hit) * force;
+      //new_pos = current + Vec2Normalize(current - (closest + Vec2(0.5, 0.5))) * force;
+
+    }
+
+    if (current != new_pos) {
+      // Make sure the new node is in line of sight
+#if 1
+      if (!IsPassablePath(game_->GetMap(), current, new_pos, radius)) {
+        new_pos = current;
+      }
+#else
+      if (!Util::IsClearPath(current, new_pos, 1, level)) {
+        new_pos = current;
+      }
+#endif
+    }
+#endif
+
+    result[i] = new_pos;
+  }
+
+  if (result.size() <= 2) return;
+
+#if 0
+  for (int i = 0; i < 1; ++i) {
+    result = PerformCulling(level, result, push_distance, radius);
+  }
+#endif
+
+#if 1
+  std::vector<Vector2f> minimum;
+  minimum.reserve(result.size());
+
+  minimum.push_back(result[0]);
+
+  Vector2f prev = minimum[0];
+
+  for (std::size_t i = 1; i < result.size(); ++i) {
+    Vector2f curr = result[i];
+    Vector2f direction = Normalize(curr - prev);
+    Vector2f side = Perpendicular(direction) * radius;
+    double dist = prev.Distance(curr);
+
+    CastResult cast_center = RayCast(game_->GetMap(), prev, direction, dist);
+    CastResult cast_side1 = RayCast(game_->GetMap(), prev + side, direction, dist);
+    CastResult cast_side2 = RayCast(game_->GetMap(), prev - side, direction, dist);
+
+    if (cast_center.hit || cast_side1.hit || cast_side2.hit) {
+      if (minimum.size() > result.size()) {
+        minimum = result;
+        break;
+      }
+
+      if (result[i - 1] != minimum.back()) {
+        minimum.push_back(result[i - 1]);
+        prev = minimum.back();
+        i--;
+      } else {
+        minimum.push_back(result[i]);
+        prev = minimum.back();
+      }
+    }
+  }
+
+  minimum.push_back(result.back());
+
+  result = minimum;
+#endif
+}
+
 // Temporary code just to test
 void Bot::PerformPathing(const Player& bot_player, const Player& target) {
   bool find_path = true;
@@ -99,6 +238,7 @@ void Bot::PerformPathing(const Player& bot_player, const Player& target) {
 
   if (find_path) {
     path_ = pathfinder_->FindPath(bot_player.position, target.position);
+    SmoothPath();
   }
 
   if (path_.empty()) return;

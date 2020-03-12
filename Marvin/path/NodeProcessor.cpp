@@ -3,6 +3,23 @@
 namespace marvin {
 namespace path {
 
+bool ShipCanTraverse(const Map& map, Vector2f pos, float radius) {
+  int radius_check = (int)(radius + 0.5f);
+
+  for (int y = -radius_check; y <= radius_check; ++y) {
+    for (int x = -radius_check; x <= radius_check; ++x) {
+      uint16_t world_x = (uint16_t)(pos.x + x);
+      uint16_t world_y = (uint16_t)(pos.y + y);
+
+      if (map.IsSolid(world_x, world_y)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 NodeConnections NodeProcessor::FindEdges(Node* node, Node* start, Node* goal) {
   NodeConnections connections;
 
@@ -15,6 +32,10 @@ NodeConnections NodeProcessor::FindEdges(Node* node, Node* start, Node* goal) {
       uint16_t world_y = node->point.y + y;
 
       if (map_.IsSolid(world_x, world_y)) continue;
+
+      Vector2f check_pos(world_x + 0.5f, world_y + 0.5f);
+
+      if (!ShipCanTraverse(map_, check_pos, 1.1f)) continue;
 
       NodePoint point(world_x, world_y);
       Node* current = GetNode(point);
