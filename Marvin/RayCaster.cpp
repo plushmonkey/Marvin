@@ -5,12 +5,12 @@
 
 namespace marvin {
 
-double BoxPointDistance(Vector2f box_pos, Vector2f box_extent, Vector2f p) {
+float BoxPointDistance(Vector2f box_pos, Vector2f box_extent, Vector2f p) {
   Vector2f bmin = box_pos;
   Vector2f bmax = box_pos + box_extent;
 
-  double dx = std::max(std::max(bmin.x - p.x, 0.0f), p.x - bmax.x);
-  double dy = std::max(std::max(bmin.y - p.y, 0.0f), p.y - bmax.y);
+  float dx = std::max(std::max(bmin.x - p.x, 0.0f), p.x - bmax.x);
+  float dy = std::max(std::max(bmin.y - p.y, 0.0f), p.y - bmax.y);
 
   return std::sqrt(dx * dx + dy * dy);
 }
@@ -64,14 +64,14 @@ bool RayBoxIntersect(Vector2f origin, Vector2f direction, Vector2f box_pos, Vect
   return intersected;
 }
 
-CastResult RayCast(const Map& map, Vector2f from, Vector2f direction, double max_length) {
+CastResult RayCast(const Map& map, Vector2f from, Vector2f direction, float max_length) {
   static const Vector2f kDirections[] = { Vector2f(0, 0), Vector2f(1, 0), Vector2f(-1, 0), Vector2f(0, 1), Vector2f(0, -1) };
 
   CastResult result = { 0 };
   float closest_distance = std::numeric_limits<float>::max();
   Vector2f closest_normal;
 
-  for (double i = 0; i < max_length; ++i) {
+  for (float i = 0; i < max_length; ++i) {
     Vector2f current = from + direction * i;
 
     for (Vector2f check_direction : kDirections) {

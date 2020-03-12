@@ -49,6 +49,9 @@ struct Pathfinder {
   Pathfinder(std::unique_ptr<NodeProcessor> processor);
   std::vector<Vector2f> FindPath(const Vector2f& from, const Vector2f& to);
 
+  std::vector<Vector2f> SmoothPath(const std::vector<Vector2f>& path,
+                                   const Map& map, float ship_radius);
+
  private:
   struct NodeCompare {
     bool operator()(const Node* lhs, const Node* rhs) const {

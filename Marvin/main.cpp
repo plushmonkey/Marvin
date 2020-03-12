@@ -13,6 +13,10 @@
 
 #include "path/Pathfinder.h"
 
+namespace marvin {
+std::ofstream debug_log;
+}
+
 const char* kEnabledText = "Continuum (enabled)";
 const char* kDisabledText = "Continuum (disabled)";
 
@@ -24,7 +28,6 @@ std::unique_ptr<marvin::Bot> g_Bot;
 static bool g_Enabled = true;
 static HWND g_hWnd;
 static time_point g_LastUpdateTime;
-static std::ofstream flog;
 
 static SHORT(WINAPI* RealGetAsyncKeyState)(int vKey) = GetAsyncKeyState;
 static BOOL(WINAPI* RealPeekMessageA)(LPMSG lpMsg, HWND hWnd,
@@ -48,18 +51,22 @@ SHORT WINAPI OverrideGetAsyncKeyState(int vKey) {
 BOOL WINAPI OverridePeekMessageA(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin,
                                  UINT wMsgFilterMax, UINT wRemoveMsg) {
   // Check for key presses to enable/disable the bot.
-  if (RealGetAsyncKeyState(VK_F10)) {
-    g_Enabled = false;
-    SetWindowText(g_hWnd, kDisabledText);
-  } else if (RealGetAsyncKeyState(VK_F9)) {
-    g_Enabled = true;
-    SetWindowText(g_hWnd, kEnabledText);
+  if (GetActiveWindow() == g_hWnd) {
+    if (RealGetAsyncKeyState(VK_F10)) {
+      g_Enabled = false;
+      SetWindowText(g_hWnd, kDisabledText);
+    } else if (RealGetAsyncKeyState(VK_F9)) {
+      g_Enabled = true;
+      SetWindowText(g_hWnd, kEnabledText);
+    }
   }
 
   time_point now = time_clock::now();
   seconds dt = now - g_LastUpdateTime;
 
-  g_Bot->Update(dt.count());
+  if (g_Enabled) {
+    g_Bot->Update(dt.count());
+  }
 
   g_LastUpdateTime = now;
 
@@ -103,9 +110,9 @@ BOOL WINAPI DllMain(HINSTANCE hInst, DWORD dwReason, LPVOID reserved) {
   }
 
   if (dwReason == DLL_PROCESS_ATTACH) {
-    flog.open("marvin.log", std::ios::out | std::ios::app);
+    marvin::debug_log.open("marvin.log", std::ios::out | std::ios::app);
 
-    flog << "Starting marvin.\n";
+    marvin::debug_log << "Starting marvin.\n";
 
     CreateBot();
 

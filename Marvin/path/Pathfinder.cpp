@@ -3,8 +3,47 @@
 #include <algorithm>
 #include <cmath>
 
+#include "../RayCaster.h"
+
 namespace marvin {
 namespace path {
+
+Vector2f ClosestWall(const Map& map, Vector2f pos, int search) {
+  float closest_dist = std::numeric_limits<float>::max();
+  Vector2f closest;
+
+  Vector2f base(std::floor(pos.x), std::floor(pos.y));
+  for (int y = -search; y <= search; ++y) {
+    for (int x = -search; x <= search; ++x) {
+      Vector2f current = base + Vector2f((float)x, (float)y);
+
+      if (!map.IsSolid((unsigned short)current.x, (unsigned short)current.y)) {
+        continue;
+      }
+
+      float dist = BoxPointDistance(current, Vector2f(1, 1), pos);
+
+      if (dist < closest_dist) {
+        closest_dist = dist;
+        closest = current;
+      }
+    }
+  }
+
+  return closest;
+}
+
+bool IsPassablePath(const Map& map, Vector2f from, Vector2f to, float radius) {
+  const Vector2f direction = Normalize(to - from);
+  const Vector2f side = Perpendicular(direction) * (radius * 0.3f);
+  const float distance = from.Distance(to);
+
+  CastResult cast_center = RayCast(map, from, direction, distance);
+  // CastResult cast_side1 = RayCast(level, from + side, direction, distance);
+  // CastResult cast_side2 = RayCast(level, from - side, direction, distance);
+
+  return !cast_center.hit;  //&& !cast_side1.hit && !cast_side2.hit;
+}
 
 NodePoint ToNodePoint(const Vector2f v) {
   NodePoint np;
@@ -93,6 +132,91 @@ std::vector<Vector2f> Pathfinder::FindPath(const Vector2f& from,
   }
 
   return path;
+}
+
+std::vector<Vector2f> Pathfinder::SmoothPath(const std::vector<Vector2f>& path,
+                                             const Map& map,
+                                             float ship_radius) {
+  std::vector<Vector2f> result;
+
+  // How far away it should try to push the path from walls
+  float push_distance = 2.1f;
+
+  result.resize(path.size());
+
+  for (std::size_t i = 0; i < path.size(); ++i) {
+    Vector2f current = path[i] + Vector2f(0.5, 0.5);
+    Vector2f closest =
+        ClosestWall(map, current, (int)std::ceil(push_distance + 1));
+    Vector2f new_pos = current;
+
+    if (closest != Vector2f(0, 0)) {
+      // Attempt to push the path outward from the wall
+      // TODO: iterative box penetration push
+
+      Vector2f center = closest + Vector2f(0.5, 0.5);
+      CastResult cast_result = RayCast(map, current, center, push_distance + 1);
+      Vector2f hit = cast_result.hit ? cast_result.position : center;
+
+      // double dist = BoxPointDistance(closest, Vec2(1, 1), current);
+      float dist = hit.Distance(current);
+      float force = push_distance - dist;
+
+      if (force < 0) force = 0;
+
+      new_pos = current + Normalize(current - hit) * force;
+    }
+
+    if (current != new_pos) {
+      // Make sure the new node is in line of sight
+      if (!IsPassablePath(map, current, new_pos, ship_radius)) {
+        new_pos = current;
+      }
+    }
+
+    result[i] = new_pos;
+  }
+
+  if (result.size() <= 2) return result;
+
+  std::vector<Vector2f> minimum;
+  minimum.reserve(result.size());
+
+  minimum.push_back(result[0]);
+
+  Vector2f prev = minimum[0];
+
+  for (std::size_t i = 1; i < result.size(); ++i) {
+    Vector2f curr = result[i];
+    Vector2f direction = Normalize(curr - prev);
+    Vector2f side = Perpendicular(direction) * ship_radius;
+    float dist = prev.Distance(curr);
+
+    CastResult cast_center = RayCast(map, prev, direction, dist);
+    CastResult cast_side1 = RayCast(map, prev + side, direction, dist);
+    CastResult cast_side2 = RayCast(map, prev - side, direction, dist);
+
+    if (cast_center.hit || cast_side1.hit || cast_side2.hit) {
+      if (minimum.size() > result.size()) {
+        minimum = result;
+        break;
+      }
+
+      if (result[i - 1] != minimum.back()) {
+        minimum.push_back(result[i - 1]);
+        prev = minimum.back();
+        i--;
+      } else {
+        minimum.push_back(result[i]);
+        prev = minimum.back();
+      }
+    }
+  }
+
+  minimum.push_back(result.back());
+
+  result = minimum;
+  return result;
 }
 
 }  // namespace path

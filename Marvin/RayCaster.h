@@ -13,8 +13,8 @@ struct CastResult {
 };
 
 bool RayBoxIntersect(Vector2f origin, Vector2f direction, Vector2f box_pos, Vector2f box_extent, float* dist, Vector2f* norm);
-double BoxPointDistance(Vector2f box_pos, Vector2f box_extent, Vector2f point);
+float BoxPointDistance(Vector2f box_pos, Vector2f box_extent, Vector2f point);
 
-CastResult RayCast(const Map& map, Vector2f from, Vector2f direction, double max_length);
+CastResult RayCast(const Map& map, Vector2f from, Vector2f direction, float max_length);
 
 } // namespace marvin

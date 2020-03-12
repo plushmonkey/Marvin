@@ -71,212 +71,227 @@ marvin::Vector2f CalculateShot(const marvin::Vector2f& pShooter,
 
 namespace marvin {
 
+class PatrolNode : public behavior::BehaviorNode {
+ public:
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
+    // TODO: Implement
+
+    return behavior::ExecuteResult::Success;
+  }
+};
+
+class TargetInLineOfSightNode : public behavior::BehaviorNode {
+ public:
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
+    if (ctx.target_player == nullptr) return behavior::ExecuteResult::Failure;
+
+    auto& game = ctx.bot->GetGame();
+    const auto& target = *ctx.target_player;
+
+    auto to_target = target.position - game.GetPosition();
+
+    CastResult result = RayCast(game.GetMap(), game.GetPosition(),
+                                Normalize(to_target), to_target.Length());
+
+    return result.hit ? behavior::ExecuteResult::Failure
+                      : behavior::ExecuteResult::Success;
+  }
+};
+
+class FindEnemyNode : public behavior::BehaviorNode {
+ public:
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
+    behavior::ExecuteResult result = behavior::ExecuteResult::Failure;
+    float closest_distance = std::numeric_limits<float>::max();
+    auto& game = ctx.bot->GetGame();
+    const Player* target = nullptr;
+
+    for (std::size_t i = 0; i < game.GetPlayers().size(); ++i) {
+      const marvin::Player& player = game.GetPlayers()[i];
+
+      if (player.id == game.GetPlayer().id) continue;
+      if (player.ship > 7) continue;
+      if (player.frequency == game.GetPlayer().frequency) continue;
+      if (game.GetMap().GetTileId(player.position) == marvin::kSafeTileId)
+        continue;
+
+      if (!IsValidPosition(player.position)) continue;
+
+      float dist_sq = game.GetPlayer().position.DistanceSq(player.position);
+
+      if (dist_sq < closest_distance) {
+        closest_distance = dist_sq;
+        target = &game.GetPlayers()[i];
+        result = behavior::ExecuteResult::Success;
+      }
+    }
+
+    ctx.target_player = target;
+
+    return result;
+  }
+};
+
+class LookingAtEnemyNode : public behavior::BehaviorNode {
+ public:
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
+    if (ctx.target_player == nullptr) return behavior::ExecuteResult::Failure;
+    const Player& target = *ctx.target_player;
+    auto& game = ctx.bot->GetGame();
+    const Player& bot_player = game.GetPlayer();
+
+    float proj_speed =
+        game.GetSettings().ShipSettings[bot_player.ship].BulletSpeed / 10.0f /
+        16.0f;
+
+    Vector2f seek_position =
+        CalculateShot(game.GetPosition(), target.position, bot_player.velocity,
+                      target.velocity, proj_speed);
+
+    Vector2f direction = Normalize(seek_position - bot_player.position);
+    float dot = bot_player.GetHeading().Dot(direction);
+
+    if (dot >= 0.95) {
+      if (CanShoot(game.GetMap(), bot_player, target)) {
+        ctx.target_position = seek_position;
+        return behavior::ExecuteResult::Success;
+      }
+    }
+
+    return behavior::ExecuteResult::Failure;
+  }
+};
+
+class ShootEnemyNode : public behavior::BehaviorNode {
+ public:
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
+    ctx.bot->GetKeys().Press(VK_CONTROL);
+
+    return behavior::ExecuteResult::Success;
+  }
+};
+
+class MoveToEnemyNode : public behavior::BehaviorNode {
+public:
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
+    ctx.bot->Move(ctx.target_position, 15.0f);
+
+    return behavior::ExecuteResult::Success;
+  }
+};
+
+class PathToEnemyNode : public behavior::BehaviorNode {
+public:
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
+    bool rebuild_path = true;
+    auto& game = ctx.bot->GetGame();
+
+    auto from = game.GetPosition();
+    auto to = ctx.target_player->position;
+
+    const auto& bot_path = ctx.bot->GetPath();
+
+    if (!bot_path.empty()) {
+      if (bot_path.back().DistanceSq(to) < 3 * 3) {
+        rebuild_path = false;
+      }
+    }
+
+    if (rebuild_path) {
+      ctx.path = ctx.bot->GetPathfinder().FindPath(from, to);
+
+      int ship = game.GetPlayer().ship;
+      float ship_radius = game.GetSettings().ShipSettings[ship].Radius;
+
+      ctx.path = ctx.bot->GetPathfinder().SmoothPath(ctx.path, game.GetMap(), ship_radius);
+    }
+
+    return behavior::ExecuteResult::Success;
+  }
+};
+
+class FollowPathNode : public behavior::BehaviorNode {
+public:
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
+    if (ctx.path.empty()) return behavior::ExecuteResult::Failure;
+    
+    auto& path = ctx.path;
+
+    auto position = ctx.bot->GetGame().GetPosition();
+
+    Vector2f current = path.front();
+
+    while (current.DistanceSq(position) < 2 && !path.empty()) {
+      path.erase(path.begin());
+      current = path.front();
+    }
+
+    ctx.bot->Move(current, 0.0f);
+
+    return behavior::ExecuteResult::Success;
+  }
+};
+
 Bot::Bot(std::unique_ptr<GameProxy> game) : game_(std::move(game)) {
   auto processor = std::make_unique<path::NodeProcessor>(game_->GetMap());
 
   pathfinder_ = std::make_unique<path::Pathfinder>(std::move(processor));
+
+  auto find_enemy = std::make_unique<FindEnemyNode>();
+  auto looking_at_enemy = std::make_unique<LookingAtEnemyNode>();
+  auto target_in_los = std::make_unique<TargetInLineOfSightNode>();
+  auto shoot_enemy = std::make_unique<ShootEnemyNode>();
+  auto path_to_enemy = std::make_unique<PathToEnemyNode>();
+  auto move_to_enemy = std::make_unique<MoveToEnemyNode>();
+  auto follow_path = std::make_unique<FollowPathNode>();
+
+  auto shoot_sequence = std::make_unique<behavior::SequenceNode>(looking_at_enemy.get(), shoot_enemy.get());
+  auto parallel_shoot_enemy = std::make_unique<behavior::SequenceNode>(shoot_sequence.get(), move_to_enemy.get());
+  auto los_shoot_conditional = std::make_unique<behavior::SequenceNode>(target_in_los.get(), parallel_shoot_enemy.get());
+
+  auto path_sequence = std::make_unique<behavior::SequenceNode>(path_to_enemy.get(), follow_path.get());
+
+  auto path_or_shoot_selector = std::make_unique<behavior::SelectorNode>(los_shoot_conditional.get(), path_sequence.get());
+
+  auto handle_enemy = std::make_unique<behavior::SequenceNode>(find_enemy.get(), path_or_shoot_selector.get());
+
+  auto root_selector = std::make_unique<behavior::SelectorNode>(
+    handle_enemy.get()
+    // Patrol
+    );
+
+  behavior_nodes_.push_back(std::move(find_enemy));
+  behavior_nodes_.push_back(std::move(looking_at_enemy));
+  behavior_nodes_.push_back(std::move(target_in_los));
+  behavior_nodes_.push_back(std::move(shoot_enemy));
+  behavior_nodes_.push_back(std::move(path_to_enemy));
+  behavior_nodes_.push_back(std::move(move_to_enemy));
+  behavior_nodes_.push_back(std::move(follow_path ));
+
+  behavior_nodes_.push_back(std::move(shoot_sequence));
+  behavior_nodes_.push_back(std::move(parallel_shoot_enemy));
+  behavior_nodes_.push_back(std::move(los_shoot_conditional));
+  behavior_nodes_.push_back(std::move(path_sequence));
+  behavior_nodes_.push_back(std::move(path_or_shoot_selector));
+  behavior_nodes_.push_back(std::move(handle_enemy));
+  behavior_nodes_.push_back(std::move(root_selector));
+
+  behavior_ = std::make_unique<behavior::BehaviorEngine>(behavior_nodes_.back().get());
 }
 
 void Bot::Update(float dt) {
   keys_.ReleaseAll();
   game_->Update(dt);
-  UpdateProofOfConcept();
-}
 
-Vector2f ClosestWall(const Map& map, Vector2f pos, int search) {
-  double closest_dist = std::numeric_limits<double>::max();
-  Vector2f closest;
+  behavior::ExecuteContext ctx;
 
-  Vector2f base(std::floor(pos.x), std::floor(pos.y));
-  for (int y = -search; y <= search; ++y) {
-    for (int x = -search; x <= search; ++x) {
-      Vector2f current = base + Vector2f(x, y);
+  ctx.bot = this;
+  ctx.dt = dt;
+  ctx.path = path_;
 
-      if (!map.IsSolid((unsigned short)current.x, (unsigned short)current.y)) {
-        continue;
-      }
+  behavior_->Update(ctx);
 
-      double dist = BoxPointDistance(current, Vector2f(1, 1), pos);
-
-      if (dist < closest_dist) {
-        closest_dist = dist;
-        closest = current;
-      }
-    }
-  }
-
-  return closest;
-}
-
-bool IsPassablePath(const Map& map, Vector2f from, Vector2f to, double radius) {
-  const Vector2f direction = Normalize(to - from);
-  const Vector2f side = Perpendicular(direction) * (radius * 0.3);
-  const double distance = from.Distance(to);
-
-  CastResult cast_center = RayCast(map, from, direction, distance);
-  //CastResult cast_side1 = RayCast(level, from + side, direction, distance);
-  //CastResult cast_side2 = RayCast(level, from - side, direction, distance);
-
-  return !cast_center.hit; //&& !cast_side1.hit && !cast_side2.hit;
-}
-
-void Bot::SmoothPath() {
-  // How far away it should try to push the path from walls
-  double push_distance = 2.1;
-
-  int ship = game_->GetPlayer().ship;
-  float radius = game_->GetSettings().ShipSettings[ship].Radius / 16.0f;
-
-  std::vector<Vector2f> result;
-
-  result.resize(path_.size());
-
-  for (std::size_t i = 0; i < path_.size(); ++i) {
-    Vector2f current = path_[i] + Vector2f(0.5, 0.5);
-    Vector2f closest = ClosestWall(game_->GetMap(), current, (int)std::ceil(push_distance + 1));
-    Vector2f new_pos = current;
-
-#if 1
-    if (closest != Vector2f(0, 0)) {
-      // Attempt to push the path outward from the wall
-      // TODO: iterative box penetration push
-
-      Vector2f center = closest + Vector2f(0.5, 0.5);
-      CastResult cast_result = RayCast(game_->GetMap(), current, center, push_distance + 1);
-      Vector2f hit = cast_result.hit ? cast_result.position : center;
-
-      //double dist = BoxPointDistance(closest, Vec2(1, 1), current);
-      double dist = hit.Distance(current);
-      double force = push_distance - dist;
-
-      if (force < 0) force = 0;
-
-      new_pos = current + Normalize(current - hit) * force;
-      //new_pos = current + Vec2Normalize(current - (closest + Vec2(0.5, 0.5))) * force;
-
-    }
-
-    if (current != new_pos) {
-      // Make sure the new node is in line of sight
-#if 1
-      if (!IsPassablePath(game_->GetMap(), current, new_pos, radius)) {
-        new_pos = current;
-      }
-#else
-      if (!Util::IsClearPath(current, new_pos, 1, level)) {
-        new_pos = current;
-      }
-#endif
-    }
-#endif
-
-    result[i] = new_pos;
-  }
-
-  if (result.size() <= 2) return;
-
-#if 0
-  for (int i = 0; i < 1; ++i) {
-    result = PerformCulling(level, result, push_distance, radius);
-  }
-#endif
-
-#if 1
-  std::vector<Vector2f> minimum;
-  minimum.reserve(result.size());
-
-  minimum.push_back(result[0]);
-
-  Vector2f prev = minimum[0];
-
-  for (std::size_t i = 1; i < result.size(); ++i) {
-    Vector2f curr = result[i];
-    Vector2f direction = Normalize(curr - prev);
-    Vector2f side = Perpendicular(direction) * radius;
-    double dist = prev.Distance(curr);
-
-    CastResult cast_center = RayCast(game_->GetMap(), prev, direction, dist);
-    CastResult cast_side1 = RayCast(game_->GetMap(), prev + side, direction, dist);
-    CastResult cast_side2 = RayCast(game_->GetMap(), prev - side, direction, dist);
-
-    if (cast_center.hit || cast_side1.hit || cast_side2.hit) {
-      if (minimum.size() > result.size()) {
-        minimum = result;
-        break;
-      }
-
-      if (result[i - 1] != minimum.back()) {
-        minimum.push_back(result[i - 1]);
-        prev = minimum.back();
-        i--;
-      } else {
-        minimum.push_back(result[i]);
-        prev = minimum.back();
-      }
-    }
-  }
-
-  minimum.push_back(result.back());
-
-  result = minimum;
-#endif
-}
-
-// Temporary code just to test
-void Bot::PerformPathing(const Player& bot_player, const Player& target) {
-  bool find_path = true;
-
-#if 0
-  if (!path_.empty()) {
-    Vector2f goal = path_[path_.size() - 1];
-
-    if (goal.DistanceSq(target.position) < 3) {
-      find_path = false;
-    }
-  }
-#endif
-
-  if (find_path) {
-    path_ = pathfinder_->FindPath(bot_player.position, target.position);
-    SmoothPath();
-  }
-
-  if (path_.empty()) return;
-
-  Vector2f current = path_.front();
-
-  while (current.DistanceSq(bot_player.position) < 2 && !path_.empty()) {
-    path_.erase(path_.begin());
-    current = path_.front();
-  }
-
-  Move(current, 0.0f);
-}
-
-// Temporary code just to test
-void Bot::AttackTarget(const Player& bot_player, const Player& target,
-                       float distance) {
-  const float kTargetDistance = 15.0f;
-  float proj_speed =
-      game_->GetSettings().ShipSettings[bot_player.ship].BulletSpeed / 10.0f /
-      16.0f;
-
-  Vector2f seek_position =
-      CalculateShot(game_->GetPosition(), target.position, bot_player.velocity,
-                    target.velocity, proj_speed);
-
-  // marvin::Vector2f seek_position = target->position;// + (target->velocity
-  // * prediction);
-  Vector2f direction = Normalize(seek_position - bot_player.position);
-  float dot = bot_player.GetHeading().Dot(direction);
-
-  if (dot >= 0.95) {
-    if (CanShoot(game_->GetMap(), bot_player, target)) {
-      keys_.Press(VK_CONTROL);
-    }
-  }
-
-  Move(seek_position, kTargetDistance);
+  path_ = ctx.path;
 }
 
 void Bot::Move(const Vector2f& target, float target_distance) {
@@ -307,51 +322,6 @@ void Bot::Move(const Vector2f& target, float target_distance) {
   if (dot < 0.985f) {
     keys_.Set(VK_RIGHT, clockwise);
     keys_.Set(VK_LEFT, !clockwise);
-  }
-}
-
-void Bot::UpdateProofOfConcept() {
-  // Simple proof of concept for targeting enemies and moving around
-  auto& bot_player = game_->GetPlayer();
-
-  const marvin::Player* target = nullptr;
-  double closest_distance = std::numeric_limits<double>::max();
-
-  for (std::size_t i = 0; i < game_->GetPlayers().size(); ++i) {
-    const marvin::Player& player = game_->GetPlayers()[i];
-
-    if (player.id == game_->GetPlayer().id) continue;
-    if (player.ship > 7) continue;
-    if (player.frequency == bot_player.frequency) continue;
-    if (game_->GetMap().GetTileId(player.position) == marvin::kSafeTileId) continue;
-    if (!IsValidPosition(player.position)) continue;
-
-    double dist_sq = bot_player.position.DistanceSq(player.position);
-
-    if (dist_sq < closest_distance) {
-      closest_distance = dist_sq;
-      target = &game_->GetPlayers()[i];
-    }
-  }
-
-  if (target) {
-    const auto& ship_settings = game_->GetSettings().ShipSettings[target->ship];
-
-    // Simple steering
-    auto heading = bot_player.GetHeading();
-    marvin::Vector2f trajectory = target->position - game_->GetPosition();
-    float distance = trajectory.Length();
-    float target_max_speed = ship_settings.MaximumSpeed / 10.0f / 16.0f;
-    float prediction = distance / target_max_speed;
-
-    CastResult cast = RayCast(game_->GetMap(), bot_player.position,
-                              Normalize(trajectory), distance);
-
-    if (cast.hit) {
-      PerformPathing(bot_player, *target);
-    } else {
-      AttackTarget(bot_player, *target, distance);
-    }
   }
 }
 

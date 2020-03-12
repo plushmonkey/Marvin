@@ -145,6 +145,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="behavior\BehaviorEngine.cpp" />
+    <ClCompile Include="behavior\BehaviorTree.cpp" />
     <ClCompile Include="Bot.cpp" />
     <ClCompile Include="KeyController.cpp" />
     <ClCompile Include="Map.cpp" />
@@ -156,6 +158,8 @@
     <ClCompile Include="RayCaster.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="behavior\BehaviorEngine.h" />
+    <ClInclude Include="behavior\BehaviorTree.h" />
     <ClInclude Include="Bot.h" />
     <ClInclude Include="ClientSettings.h" />
     <ClInclude Include="Hash.h" />
