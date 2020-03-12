@@ -104,37 +104,38 @@ marvin::Bot& CreateBot() {
   return *g_Bot;
 }
 
+extern "C" __declspec(dllexport) void InitializeMarvin() {
+  marvin::debug_log.open("marvin.log", std::ios::out | std::ios::app);
+
+  marvin::debug_log << "Starting marvin.\n";
+
+  CreateBot();
+
+  DetourRestoreAfterWith();
+
+  DetourTransactionBegin();
+  DetourUpdateThread(GetCurrentThread());
+  DetourAttach(&(PVOID&)RealGetAsyncKeyState, OverrideGetAsyncKeyState);
+  DetourAttach(&(PVOID&)RealPeekMessageA, OverridePeekMessageA);
+  DetourTransactionCommit();
+
+  g_hWnd = GetMainWindow();
+
+  SetWindowText(g_hWnd, kEnabledText);
+}
+
+extern "C" __declspec(dllexport) void CleanupMarvin() {
+  DetourTransactionBegin();
+  DetourUpdateThread(GetCurrentThread());
+  DetourDetach(&(PVOID&)RealGetAsyncKeyState, OverrideGetAsyncKeyState);
+  DetourDetach(&(PVOID&)RealPeekMessageA, OverridePeekMessageA);
+  DetourTransactionCommit();
+
+  SetWindowText(g_hWnd, "Continuum");
+
+  g_Bot = nullptr;
+}
+
 BOOL WINAPI DllMain(HINSTANCE hInst, DWORD dwReason, LPVOID reserved) {
-  if (DetourIsHelperProcess()) {
-    return TRUE;
-  }
-
-  if (dwReason == DLL_PROCESS_ATTACH) {
-    marvin::debug_log.open("marvin.log", std::ios::out | std::ios::app);
-
-    marvin::debug_log << "Starting marvin.\n";
-
-    CreateBot();
-
-    DetourRestoreAfterWith();
-
-    DetourTransactionBegin();
-    DetourUpdateThread(GetCurrentThread());
-    DetourAttach(&(PVOID&)RealGetAsyncKeyState, OverrideGetAsyncKeyState);
-    DetourAttach(&(PVOID&)RealPeekMessageA, OverridePeekMessageA);
-    DetourTransactionCommit();
-
-    g_hWnd = GetMainWindow();
-
-    SetWindowText(g_hWnd, kEnabledText);
-
-  } else if (dwReason == DLL_PROCESS_DETACH) {
-    DetourTransactionBegin();
-    DetourUpdateThread(GetCurrentThread());
-    DetourDetach(&(PVOID&)RealGetAsyncKeyState, OverrideGetAsyncKeyState);
-    DetourDetach(&(PVOID&)RealPeekMessageA, OverridePeekMessageA);
-    DetourTransactionCommit();
-  }
-
   return TRUE;
 }

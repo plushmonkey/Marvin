@@ -5,6 +5,11 @@
 #include <memory>
 #include <vector>
 
+/*
+  Injector injects the Loader.dll into the Continuum process.
+  The loader is the one that loads the Marvin.dll so it can hot swap it.
+*/
+
 #ifdef UNICODE
 #undef UNICODE
 #endif
@@ -13,6 +18,8 @@
 #include <Windows.h>
 //
 #include <TlHelp32.h>
+
+#define INJECT_MODULE_NAME "Loader.dll"
 
 namespace marvin {
 namespace memory {
@@ -286,7 +293,7 @@ DWORD SelectPid(const std::vector<DWORD>& pids) {
   for (std::size_t i = 0; i < pids.size(); ++i) {
     auto pid = pids[i];
     auto game =
-      marvin::ContinuumGameProxy(std::make_unique<marvin::Process>(pid));
+        marvin::ContinuumGameProxy(std::make_unique<marvin::Process>(pid));
 
     std::string name = game.GetName();
 
@@ -294,7 +301,7 @@ DWORD SelectPid(const std::vector<DWORD>& pids) {
 
     auto& process = game.GetProcess();
 
-    if (process.HasModule("Marvin.dll")) {
+    if (process.HasModule(INJECT_MODULE_NAME)) {
       std::cout << " - Already loaded." << std::endl;
     } else {
       std::cout << std::endl;
@@ -308,7 +315,7 @@ DWORD SelectPid(const std::vector<DWORD>& pids) {
 
   auto selection = strtol(input.c_str(), nullptr, 10);
 
-  if (selection < 1 || selection > pids.size()) {
+  if (selection < 1 || selection > (long)pids.size()) {
     std::cerr << "Invalid selection." << std::endl;
     return 0;
   }
@@ -327,10 +334,10 @@ int main(int argc, char* argv[]) {
 
   if (continuum_pids.empty()) {
     std::cout << "No Continuum.exe processes found." << std::endl;
-    return 0;
+    return EXIT_FAILURE;
   }
 
-  std::string inject_path = marvin::GetWorkingDirectory() + "\\Marvin.dll";
+  std::string inject_path = marvin::GetWorkingDirectory() + "\\" + INJECT_MODULE_NAME;
 
   DWORD pid = SelectPid(continuum_pids);
 
@@ -340,8 +347,9 @@ int main(int argc, char* argv[]) {
 
   auto process = std::make_unique<marvin::Process>(pid);
 
-  if (process->HasModule("Marvin.dll")) {
-    std::cerr << "Invalid selection. " << pid << " already has Marvin loaded." << std::endl;
+  if (process->HasModule(INJECT_MODULE_NAME)) {
+    std::cerr << "Invalid selection. " << pid << " already has Marvin loaded."
+              << std::endl;
     return EXIT_FAILURE;
   }
 
