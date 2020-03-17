@@ -21,8 +21,14 @@ class GameProxy {
   virtual Vector2f GetPosition() const = 0;
   virtual const std::vector<Player>& GetPlayers() const = 0;
   virtual const ClientSettings& GetSettings() const = 0;
+  virtual const ShipSettings& GetShipSettings() const = 0;
   virtual const Map& GetMap() const = 0;
   virtual const Player& GetPlayer() const = 0;
+
+  // May need to be called more than once to transition the game menu
+  // Returns true if it attempts to set the ship this call.
+  virtual bool SetShip(int ship) = 0;
+  virtual void Warp() = 0;
 };
 
 }  // namespace marvin

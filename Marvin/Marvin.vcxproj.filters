@@ -54,6 +54,9 @@
     <ClCompile Include="behavior\BehaviorEngine.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="RegionRegistry.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GameProxy.h">
@@ -111,6 +114,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="behavior\BehaviorTree.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="behavior\Blackboard.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RegionRegistry.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

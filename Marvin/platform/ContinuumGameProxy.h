@@ -18,18 +18,25 @@ class ContinuumGameProxy : public GameProxy {
   Vector2f GetPosition() const override;
   const std::vector<Player>& GetPlayers() const override;
   const ClientSettings& GetSettings() const override;
+  const ShipSettings& GetShipSettings() const override;
   std::string GetServerFolder() const;
   const Map& GetMap() const override;
   const Player& GetPlayer() const override;
 
+  bool SetShip(int ship) override;
+  void Warp() override;
+
   void SetWindowFocus();
+  void SetWindow(HWND hwnd);
 
   ExeProcess& GetProcess();
 
  private:
   void FetchPlayers();
+  void SendKey(int vKey);
 
   ExeProcess process_;
+  HWND hwnd_;
   std::size_t module_base_continuum_;
   std::size_t module_base_menu_;
   std::size_t game_addr_;

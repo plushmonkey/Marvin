@@ -5,6 +5,7 @@
 
 #include "../Player.h"
 #include "../Vector2f.h"
+#include "Blackboard.h"
 
 namespace marvin {
 
@@ -15,14 +16,11 @@ namespace behavior {
 enum class ExecuteResult { Success, Failure, Running };
 
 struct ExecuteContext {
-  // TODO: Probably some blackboard-type structure
-  // Just storing random variables that are used in here.
-
+  Blackboard blackboard;
   Bot* bot;
   float dt;
-  Vector2f target_position;
-  const Player* target_player;
-  std::vector<Vector2f> path;
+
+  ExecuteContext() : bot(nullptr), dt(0) {}
 };
 
 class BehaviorNode {
@@ -46,30 +44,30 @@ class SequenceNode : public BehaviorNode {
 };
 
 class ParallelNode : public BehaviorNode {
-public:
+ public:
   ParallelNode(std::vector<BehaviorNode*> children);
   template <typename... Args>
   ParallelNode(Args... children)
-    : ParallelNode(
-      std::vector<BehaviorNode*>({ std::forward<Args>(children)... })) {}
+      : ParallelNode(
+            std::vector<BehaviorNode*>({std::forward<Args>(children)...})) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override;
 
-private:
+ private:
   std::vector<BehaviorNode*> children_;
 };
 
 class SelectorNode : public BehaviorNode {
-public:
+ public:
   SelectorNode(std::vector<BehaviorNode*> children);
   template <typename... Args>
   SelectorNode(Args... children)
-    : SelectorNode(
-      std::vector<BehaviorNode*>({ std::forward<Args>(children)... })) {}
+      : SelectorNode(
+            std::vector<BehaviorNode*>({std::forward<Args>(children)...})) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override;
 
-private:
+ private:
   std::vector<BehaviorNode*> children_;
 };
 

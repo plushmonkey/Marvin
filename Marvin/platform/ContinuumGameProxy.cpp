@@ -1,5 +1,6 @@
 #include "ContinuumGameProxy.h"
 
+#include <thread>
 #include <vector>
 
 #include "../Map.h"
@@ -10,6 +11,7 @@ ContinuumGameProxy::ContinuumGameProxy() {
   module_base_continuum_ = process_.GetModuleBase("Continuum.exe");
   module_base_menu_ = process_.GetModuleBase("menu040.dll");
   player_id_ = 0xFFFF;
+  hwnd_ = nullptr;
 
   game_addr_ = process_.ReadU32(module_base_continuum_ + 0xC1AFC);
 
@@ -102,6 +104,10 @@ const ClientSettings& ContinuumGameProxy::GetSettings() const {
   return *reinterpret_cast<ClientSettings*>(addr);
 }
 
+const ShipSettings& ContinuumGameProxy::GetShipSettings() const {
+  return GetSettings().ShipSettings[player_->ship];
+}
+
 std::string ContinuumGameProxy::GetName() const {
   const std::size_t ProfileStructSize = 2860;
 
@@ -144,12 +150,35 @@ std::string ContinuumGameProxy::GetServerFolder() const {
   return server_folder;
 }
 
+bool ContinuumGameProxy::SetShip(int ship) {
+  int* menu_open_addr = (int*)(game_addr_ + 0x12F39);
+
+  bool menu_open = *menu_open_addr;
+
+  if (!menu_open) {
+    SendKey(VK_ESCAPE);
+  } else {
+    SendMessage(hwnd_, WM_CHAR, (WPARAM)('1' + ship), 0);
+  }
+
+  return menu_open;
+}
+
+void ContinuumGameProxy::Warp() { SendKey(VK_INSERT); }
+
 void ContinuumGameProxy::SetWindowFocus() {
   std::size_t focus_addr = game_addr_ + 0x3039c;
 
   process_.WriteU32(focus_addr, 1);
 }
 
+void ContinuumGameProxy::SetWindow(HWND hwnd) { hwnd_ = hwnd; }
+
 ExeProcess& ContinuumGameProxy::GetProcess() { return process_; }
+
+void ContinuumGameProxy::SendKey(int vKey) {
+  SendMessage(hwnd_, WM_KEYDOWN, (WPARAM)vKey, 0);
+  SendMessage(hwnd_, WM_KEYUP, (WPARAM)vKey, 0);
+}
 
 }  // namespace marvin

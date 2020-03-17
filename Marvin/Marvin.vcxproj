@@ -92,6 +92,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -119,6 +120,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -156,10 +158,12 @@
     <ClCompile Include="platform\ExeProcess.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="RayCaster.cpp" />
+    <ClCompile Include="RegionRegistry.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="behavior\BehaviorEngine.h" />
     <ClInclude Include="behavior\BehaviorTree.h" />
+    <ClInclude Include="behavior\Blackboard.h" />
     <ClInclude Include="Bot.h" />
     <ClInclude Include="ClientSettings.h" />
     <ClInclude Include="Hash.h" />
@@ -175,6 +179,7 @@
     <ClInclude Include="platform\Platform.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="RayCaster.h" />
+    <ClInclude Include="RegionRegistry.h" />
     <ClInclude Include="Types.h" />
     <ClInclude Include="Vector2f.h" />
   </ItemGroup>

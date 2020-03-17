@@ -11,7 +11,10 @@ TileId Map::GetTileId(u16 x, u16 y) const {
   return tile_data_[y * kMapExtent + x];
 }
 
-bool Map::IsSolid(u16 x, u16 y) const { return IsSolid(GetTileId(x, y)); }
+bool Map::IsSolid(u16 x, u16 y) const {
+  if (x >= 1024 || y >= 1024) return true;
+  return IsSolid(GetTileId(x, y));
+}
 
 bool Map::IsSolid(TileId id) const {
   if (id == 0) return false;

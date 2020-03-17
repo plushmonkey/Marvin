@@ -144,6 +144,13 @@ inline Vector2f Normalize(const Vector2f& v) {
 
 inline Vector2f Perpendicular(const Vector2f& v) { return Vector2f(-v.y, v.x); }
 
+inline Vector2f Rotate(const Vector2f& v, float rads) {
+  float cosA = std::cos(rads);
+  float sinA = std::sin(rads);
+
+  return Vector2f(cosA * v.x - sinA * v.y, sinA * v.x + cosA * v.y);
+}
+
 inline bool operator<(const Vector2f& lhs, const Vector2f& rhs) noexcept {
   if (lhs.y < rhs.y) {
     return true;

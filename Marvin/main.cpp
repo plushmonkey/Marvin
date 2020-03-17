@@ -8,10 +8,9 @@
 
 #include "Bot.h"
 #include "Map.h"
+#include "path/Pathfinder.h"
 #include "platform/ContinuumGameProxy.h"
 #include "platform/ExeProcess.h"
-
-#include "path/Pathfinder.h"
 
 namespace marvin {
 std::ofstream debug_log;
@@ -99,12 +98,17 @@ HWND GetMainWindow() {
 
 marvin::Bot& CreateBot() {
   auto proxy = std::make_unique<marvin::ContinuumGameProxy>();
+
+  proxy->SetWindow(g_hWnd);
+
   g_Bot = std::make_unique<marvin::Bot>(std::move(proxy));
 
   return *g_Bot;
 }
 
 extern "C" __declspec(dllexport) void InitializeMarvin() {
+  g_hWnd = GetMainWindow();
+
   marvin::debug_log.open("marvin.log", std::ios::out | std::ios::app);
 
   marvin::debug_log << "Starting marvin.\n";
@@ -118,8 +122,6 @@ extern "C" __declspec(dllexport) void InitializeMarvin() {
   DetourAttach(&(PVOID&)RealGetAsyncKeyState, OverrideGetAsyncKeyState);
   DetourAttach(&(PVOID&)RealPeekMessageA, OverridePeekMessageA);
   DetourTransactionCommit();
-
-  g_hWnd = GetMainWindow();
 
   SetWindowText(g_hWnd, kEnabledText);
 }

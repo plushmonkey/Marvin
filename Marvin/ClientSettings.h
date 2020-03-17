@@ -2,8 +2,11 @@
 
 #include <cstdint>
 
+#include "RegionRegistry.h"
+
 namespace marvin {
 
+#pragma pack(push, 1)
 // Per-ship settings
 struct ShipSettings {
   // How long Super lasts on the ship (in ticks)
@@ -185,6 +188,12 @@ struct ShipSettings {
     uint32_t padding2 : 3;
   };
   unsigned char _padding[16];
+
+  float GetRadius() const {
+    int r = Radius == 0 ? 14 : Radius;
+
+    return r / 16.0f;
+  }
 };
 
 // Structure to define the starting coordinates for teams 0-3
@@ -196,6 +205,20 @@ struct SpawnSettings {
   // How large of a circle from the center point this team can start
   int Radius : 9;
   int _pad : 3;
+
+  MapCoord GetCoord() const {
+    MapCoord result(X, Y);
+
+    if (X < 0) {
+      result.x = (uint16_t)-X;
+    }
+
+    if (Y < 0) {
+      result.y = (uint16_t)-Y;
+    }
+
+    return result;
+  }
 };
 
 // Likelihood of each prize appearing
@@ -494,5 +517,6 @@ struct ClientSettings {
 
   PrizeWeightSettings PrizeWeights;
 };
+#pragma pack(pop)
 
 }  // namespace marvin
