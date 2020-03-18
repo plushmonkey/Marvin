@@ -126,36 +126,18 @@ class FindEnemyNode : public behavior::BehaviorNode {
     auto& game = ctx.bot->GetGame();
     const Player* target = nullptr;
     const Player& bot_player = ctx.bot->GetGame().GetPlayer();
-    bool bot_has_x = (bot_player.status & 4) != 0;
 
     Vector2f resolution(1920, 1080);
-    Vector2f view_min = bot_player.position - resolution / 2.0f / 16.0f;
-    Vector2f view_max = bot_player.position + resolution / 2.0f / 16.0f;
+    view_min_ = bot_player.position - resolution / 2.0f / 16.0f;
+    view_max_ = bot_player.position + resolution / 2.0f / 16.0f;
 
     for (std::size_t i = 0; i < game.GetPlayers().size(); ++i) {
       const marvin::Player& player = game.GetPlayers()[i];
 
-      if (player.id == game.GetPlayer().id) continue;
-      if (player.ship > 7) continue;
-      if (player.frequency == game.GetPlayer().frequency) continue;
-      if (game.GetMap().GetTileId(player.position) == marvin::kSafeTileId)
-        continue;
+      if (!IsValidTarget(ctx, player)) continue;
 
-      if (!IsValidPosition(player.position)) continue;
-
-      bool stealthing = (player.status & 2) != 0;
-      bool cloaking = (player.status & 2) != 0;
-
-      if (!bot_has_x) {
-        if (stealthing && cloaking) continue;
-
-        bool visible = InRect(player.position, view_min, view_max);
-
-        if (stealthing && !visible) continue;
-      }
-
-      Vector2f to_target = player.position - bot_player.position;
-      float dot = bot_player.GetHeading().Dot(to_target);
+      Vector2f direction = Normalize(player.position - bot_player.position);
+      float dot = bot_player.GetHeading().Dot(direction);
       float dist = game.GetPlayer().position.Distance(player.position);
       float multiplier = 1.0f + ((1.0f - dot) / kRotationMultiplier);
       float calc = dist * multiplier;
@@ -180,6 +162,47 @@ class FindEnemyNode : public behavior::BehaviorNode {
 
     return result;
   }
+
+ private:
+  bool IsValidTarget(behavior::ExecuteContext& ctx, const Player& target) {
+    const auto& game = ctx.bot->GetGame();
+    const Player& bot_player = game.GetPlayer();
+
+    if (target.id == game.GetPlayer().id) return false;
+    if (target.ship > 7) return false;
+    if (target.frequency == game.GetPlayer().frequency) return false;
+
+    if (game.GetMap().GetTileId(target.position) == marvin::kSafeTileId) {
+      return false;
+    }
+
+    if (!IsValidPosition(target.position)) {
+      return false;
+    }
+
+    MapCoord bot_coord(bot_player.position);
+    MapCoord target_coord(target.position);
+
+    if (!ctx.bot->GetRegions().IsConnected(bot_coord, target_coord)) {
+      return false;
+    }
+
+    bool stealthing = (target.status & 2) != 0;
+    bool cloaking = (target.status & 2) != 0;
+
+    if (!(game.GetPlayer().status & 4)) {
+      if (stealthing && cloaking) return false;
+
+      bool visible = InRect(target.position, view_min_, view_max_);
+
+      if (stealthing && !visible) return false;
+    }
+
+    return true;
+  }
+
+  Vector2f view_min_;
+  Vector2f view_max_;
 };
 
 class LookingAtEnemyNode : public behavior::BehaviorNode {

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -289,6 +290,29 @@ class ContinuumGameProxy : public GameProxy {
 
 }  // namespace marvin
 
+DWORD SelectPid(const std::vector<DWORD>& pids, std::string target_player) {
+  std::transform(target_player.begin(), target_player.end(),
+                 target_player.begin(), tolower);
+
+  for (std::size_t i = 0; i < pids.size(); ++i) {
+    auto pid = pids[i];
+    auto game =
+        marvin::ContinuumGameProxy(std::make_unique<marvin::Process>(pid));
+
+    std::string name = game.GetName();
+
+    std::transform(name.begin(), name.end(), name.begin(), tolower);
+
+    if (name == target_player) {
+      return pid;
+    }
+  }
+
+  std::cerr << "Failed to find process with that name." << std::endl;
+
+  return 0;
+}
+
 DWORD SelectPid(const std::vector<DWORD>& pids) {
   for (std::size_t i = 0; i < pids.size(); ++i) {
     auto pid = pids[i];
@@ -337,9 +361,26 @@ int main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
 
-  std::string inject_path = marvin::GetWorkingDirectory() + "\\" + INJECT_MODULE_NAME;
+  std::string inject_path =
+      marvin::GetWorkingDirectory() + "\\" + INJECT_MODULE_NAME;
 
-  DWORD pid = SelectPid(continuum_pids);
+  DWORD pid = 0;
+
+  if (argc > 1) {
+    std::string target_player;
+
+    for (int i = 1; i < argc; ++i) {
+      if (i != 1) {
+        target_player += " ";
+      }
+
+      target_player += argv[i];
+    }
+
+    pid = SelectPid(continuum_pids, target_player);
+  } else {
+    pid = SelectPid(continuum_pids);
+  }
 
   if (pid == 0) {
     return EXIT_FAILURE;

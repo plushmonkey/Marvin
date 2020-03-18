@@ -28,6 +28,7 @@ class Bot {
   path::Pathfinder& GetPathfinder() { return *pathfinder_; }
 
   const std::vector<Vector2f>& GetPath() const { return path_; }
+  const RegionRegistry& GetRegions() const { return *regions_; }
 
  private:
   void Steer();
