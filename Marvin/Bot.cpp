@@ -84,7 +84,26 @@ namespace marvin {
 class PatrolNode : public behavior::BehaviorNode {
  public:
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
-    // TODO: Implement
+    auto& game = ctx.bot->GetGame();
+
+    Vector2f from = game.GetPosition();
+    // TODO: Implement list
+    Vector2f to(500, 615);
+
+    // Don't both recreating the path if the current path is this one.
+    auto existing_path =
+        ctx.blackboard.ValueOr("path", std::vector<Vector2f>());
+    if (!existing_path.empty() && existing_path.back().DistanceSq(to) < 3 * 3) {
+      return behavior::ExecuteResult::Success;
+    }
+
+    std::vector<Vector2f> path = ctx.bot->GetPathfinder().FindPath(from, to);
+
+    float radius = game.GetShipSettings().GetRadius();
+
+    path = ctx.bot->GetPathfinder().SmoothPath(path, game.GetMap(), radius);
+
+    ctx.blackboard.Set("path", path);
 
     return behavior::ExecuteResult::Success;
   }
@@ -320,8 +339,6 @@ class PathToEnemyNode : public behavior::BehaviorNode {
           ctx.bot->GetPathfinder().SmoothPath(path, game.GetMap(), ship_radius);
 
       ctx.blackboard.Set("path", path);
-
-      auto r = ctx.blackboard.Value<std::vector<Vector2f>>("path");
     }
 
     return behavior::ExecuteResult::Success;
@@ -386,6 +403,7 @@ Bot::Bot(std::unique_ptr<GameProxy> game) : game_(std::move(game)) {
   auto path_to_enemy = std::make_unique<PathToEnemyNode>();
   auto move_to_enemy = std::make_unique<MoveToEnemyNode>();
   auto follow_path = std::make_unique<FollowPathNode>();
+  auto patrol = std::make_unique<PatrolNode>();
 
   auto shoot_sequence = std::make_unique<behavior::SequenceNode>(
       looking_at_enemy.get(), shoot_enemy.get());
@@ -394,19 +412,20 @@ Bot::Bot(std::unique_ptr<GameProxy> game) : game_(std::move(game)) {
   auto los_shoot_conditional = std::make_unique<behavior::SequenceNode>(
       target_in_los.get(), parallel_shoot_enemy.get());
 
-  auto path_sequence = std::make_unique<behavior::SequenceNode>(
+  auto enemy_path_sequence = std::make_unique<behavior::SequenceNode>(
       path_to_enemy.get(), follow_path.get());
 
+  auto patrol_path_sequence =
+      std::make_unique<behavior::SequenceNode>(patrol.get(), follow_path.get());
+
   auto path_or_shoot_selector = std::make_unique<behavior::SelectorNode>(
-      los_shoot_conditional.get(), path_sequence.get());
+      los_shoot_conditional.get(), enemy_path_sequence.get());
 
   auto handle_enemy = std::make_unique<behavior::SequenceNode>(
       find_enemy.get(), path_or_shoot_selector.get());
 
-  auto root_selector =
-      std::make_unique<behavior::SelectorNode>(handle_enemy.get()
-                                               // Patrol
-      );
+  auto root_selector = std::make_unique<behavior::SelectorNode>(
+      handle_enemy.get(), patrol_path_sequence.get());
 
   behavior_nodes_.push_back(std::move(find_enemy));
   behavior_nodes_.push_back(std::move(looking_at_enemy));
@@ -415,11 +434,13 @@ Bot::Bot(std::unique_ptr<GameProxy> game) : game_(std::move(game)) {
   behavior_nodes_.push_back(std::move(path_to_enemy));
   behavior_nodes_.push_back(std::move(move_to_enemy));
   behavior_nodes_.push_back(std::move(follow_path));
+  behavior_nodes_.push_back(std::move(patrol));
 
   behavior_nodes_.push_back(std::move(shoot_sequence));
   behavior_nodes_.push_back(std::move(parallel_shoot_enemy));
   behavior_nodes_.push_back(std::move(los_shoot_conditional));
-  behavior_nodes_.push_back(std::move(path_sequence));
+  behavior_nodes_.push_back(std::move(enemy_path_sequence));
+  behavior_nodes_.push_back(std::move(patrol_path_sequence));
   behavior_nodes_.push_back(std::move(path_or_shoot_selector));
   behavior_nodes_.push_back(std::move(handle_enemy));
   behavior_nodes_.push_back(std::move(root_selector));
