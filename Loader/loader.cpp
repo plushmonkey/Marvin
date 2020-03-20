@@ -64,7 +64,19 @@ void PerformReload() {
 
   hModule = NULL;
 
-  CopyFile(g_MarvinPath.c_str(), g_MarvinLoadedPath.c_str(), FALSE);
+  bool copied = false;
+  for (int tries = 0; tries < 5; ++tries) {
+    if (CopyFile(g_MarvinPath.c_str(), g_MarvinLoadedPath.c_str(), FALSE) != 0) {
+      copied = true;
+      break;
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  }
+
+  if (!copied) {
+    MessageBox(NULL, "Failed to hot swap after 5 tries. Reinjecting old dll.", "Error", MB_OK);
+  }
 
   hModule = LoadLibrary(g_MarvinLoadedPath.c_str());
 

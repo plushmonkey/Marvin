@@ -15,6 +15,14 @@ float BoxPointDistance(Vector2f box_pos, Vector2f box_extent, Vector2f p) {
   return std::sqrt(dx * dx + dy * dy);
 }
 
+bool LineBoxIntersect(Vector2f point, Vector2f direction, Vector2f box_pos, Vector2f box_extent, float* dist, Vector2f* norm) {
+  if (RayBoxIntersect(point, direction, box_pos, box_extent, dist, norm)) {
+    return true;
+  }
+
+  return RayBoxIntersect(point, -direction, box_pos, box_extent, dist, norm);
+}
+
 bool RayBoxIntersect(Vector2f origin, Vector2f direction, Vector2f box_pos, Vector2f box_extent, float* dist, Vector2f* norm) {
   Vector2f recip(1.0f / direction.x, 1.0f / direction.y);
   Vector2f lb = box_pos + Vector2f(0, box_extent.y);
@@ -71,6 +79,8 @@ CastResult RayCast(const Map& map, Vector2f from, Vector2f direction, float max_
   float closest_distance = std::numeric_limits<float>::max();
   Vector2f closest_normal;
 
+  result.distance = max_length;
+
   for (float i = 0; i < max_length; ++i) {
     Vector2f current = from + direction * i;
 
@@ -93,6 +103,7 @@ CastResult RayCast(const Map& map, Vector2f from, Vector2f direction, float max_
     if (closest_distance < max_length) {
       result.hit = true;
       result.normal = closest_normal;
+      result.distance = closest_distance;
       result.position = from + direction * closest_distance;
     }
   }

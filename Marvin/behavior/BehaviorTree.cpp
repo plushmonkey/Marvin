@@ -39,7 +39,8 @@ ExecuteResult ParallelNode::Execute(ExecuteContext& ctx) {
 
     if (result == ExecuteResult::Success &&
         child_result != ExecuteResult::Success) {
-      result = child_result;
+      // TODO: Implement failure policies
+      //result = child_result;
     }
   }
 

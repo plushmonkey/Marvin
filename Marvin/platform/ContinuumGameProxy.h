@@ -10,11 +10,12 @@ namespace marvin {
 
 class ContinuumGameProxy : public GameProxy {
  public:
-  ContinuumGameProxy();
+  ContinuumGameProxy(HWND hwnd);
 
   void Update(float dt) override;
 
   std::string GetName() const override;
+  int GetEnergy() const override;
   Vector2f GetPosition() const override;
   const std::vector<Player>& GetPlayers() const override;
   const ClientSettings& GetSettings() const override;
@@ -27,7 +28,6 @@ class ContinuumGameProxy : public GameProxy {
   void Warp() override;
 
   void SetWindowFocus();
-  void SetWindow(HWND hwnd);
 
   ExeProcess& GetProcess();
 

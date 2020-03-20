@@ -3,15 +3,16 @@
 #include <thread>
 #include <vector>
 
+#include "../Bot.h"
 #include "../Map.h"
 
 namespace marvin {
 
-ContinuumGameProxy::ContinuumGameProxy() {
+ContinuumGameProxy::ContinuumGameProxy(HWND hwnd) {
   module_base_continuum_ = process_.GetModuleBase("Continuum.exe");
   module_base_menu_ = process_.GetModuleBase("menu040.dll");
   player_id_ = 0xFFFF;
-  hwnd_ = nullptr;
+  hwnd_ = hwnd;
 
   game_addr_ = process_.ReadU32(module_base_continuum_ + 0xC1AFC);
 
@@ -128,6 +129,8 @@ std::string ContinuumGameProxy::GetName() const {
   return name;
 }
 
+int ContinuumGameProxy::GetEnergy() const { return 0; }
+
 Vector2f ContinuumGameProxy::GetPosition() const {
   float x = (*position_data_) / 16.0f;
   float y = (*(position_data_ + 1)) / 16.0f;
@@ -171,8 +174,6 @@ void ContinuumGameProxy::SetWindowFocus() {
 
   process_.WriteU32(focus_addr, 1);
 }
-
-void ContinuumGameProxy::SetWindow(HWND hwnd) { hwnd_ = hwnd; }
 
 ExeProcess& ContinuumGameProxy::GetProcess() { return process_; }
 

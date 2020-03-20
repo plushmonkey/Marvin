@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "../GameProxy.h"
 #include "../Map.h"
 #include "Node.h"
 
@@ -19,7 +20,9 @@ struct NodeConnections {
 // Determines the node edges when using A*.
 class NodeProcessor {
  public:
-  NodeProcessor(const Map& map) : map_(map) { nodes_.resize(kMaxNodes); }
+  NodeProcessor(GameProxy& game) : game_(game), map_(game.GetMap()) {
+    nodes_.resize(kMaxNodes);
+  }
 
   void ResetNodes();
 
@@ -29,6 +32,7 @@ class NodeProcessor {
  private:
   std::vector<Node> nodes_;
   const Map& map_;
+  GameProxy& game_;
 };
 
 }  // namespace path

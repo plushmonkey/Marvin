@@ -30,6 +30,8 @@ class Bot {
   const std::vector<Vector2f>& GetPath() const { return path_; }
   const RegionRegistry& GetRegions() const { return *regions_; }
 
+  Vector2f& GetSteering() { return steering_; }
+
  private:
   void Steer();
 

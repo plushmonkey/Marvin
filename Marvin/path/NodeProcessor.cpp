@@ -35,12 +35,17 @@ NodeConnections NodeProcessor::FindEdges(Node* node, Node* start, Node* goal) {
 
       Vector2f check_pos(world_x + 0.5f, world_y + 0.5f);
 
-      if (!ShipCanTraverse(map_, check_pos, 1.1f)) continue;
+      if (!ShipCanTraverse(map_, check_pos,
+                           game_.GetShipSettings().GetRadius()))
+        continue;
 
       NodePoint point(world_x, world_y);
       Node* current = GetNode(point);
 
       if (current != nullptr) {
+        if (map_.GetTileId(point.x, point.y) == kSafeTileId) {
+          current->weight = 150.0f;
+        }
         connections.neighbors[connections.count++] = current;
 
         if (connections.count >= 8) {

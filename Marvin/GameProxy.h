@@ -18,6 +18,7 @@ class GameProxy {
   virtual void Update(float dt) = 0;
 
   virtual std::string GetName() const = 0;
+  virtual int GetEnergy() const = 0;
   virtual Vector2f GetPosition() const = 0;
   virtual const std::vector<Player>& GetPlayers() const = 0;
   virtual const ClientSettings& GetSettings() const = 0;

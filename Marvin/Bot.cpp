@@ -25,7 +25,7 @@ bool IsValidPosition(marvin::Vector2f position) {
 
 bool CanShoot(const marvin::Map& map, const marvin::Player& bot_player,
               const marvin::Player& target) {
-  if (bot_player.position.DistanceSq(target.position) > 50 * 50) return false;
+  if (bot_player.position.DistanceSq(target.position) > 60 * 60) return false;
   if (map.GetTileId(bot_player.position) == marvin::kSafeTileId) return false;
 
   return true;
@@ -57,21 +57,6 @@ marvin::Vector2f CalculateShot(const marvin::Vector2f& pShooter,
       t = t2;
   }
 
-#if 0
-  // Only use the calculated shot if its collision is within acceptable
-  // timeframe
-  if (t < 0 || t > 5) {
-    marvin::Vector2f hShooter = marvin::Normalize(vShooter);
-    marvin::Vector2f hTarget = marvin::Normalize(vTarget);
-
-    int sign = hShooter.Dot(hTarget) < 0.0 ? -1 : 1;
-
-    float speed = vShooter.Length() + (sign * vTarget.Length()) + sProjectile;
-    float look_ahead = totarget.Length() / speed;
-    return marvin::Vector2f(pTarget + vTarget * look_ahead);
-  }
-#endif
-
   solution = pTarget + (v * t);
 
   return solution;
@@ -81,27 +66,85 @@ marvin::Vector2f CalculateShot(const marvin::Vector2f& pShooter,
 
 namespace marvin {
 
-class PatrolNode : public behavior::BehaviorNode {
+class PathingNode : public behavior::BehaviorNode {
+ public:
+  using Path = std::vector<Vector2f>;
+
+  virtual behavior::ExecuteResult Execute(
+      behavior::ExecuteContext& ctx) override = 0;
+
+ protected:
+  Path CreatePath(behavior::ExecuteContext& ctx, const std::string& pathname,
+                  Vector2f from, Vector2f to) {
+    bool build = true;
+    auto& game = ctx.bot->GetGame();
+
+    Path path = ctx.blackboard.ValueOr(pathname, Path());
+
+    if (!path.empty()) {
+      // Check if the current destination is the same as the requested one.
+      if (path.back().DistanceSq(to) < 3 * 3) {
+        Vector2f pos = game.GetPosition();
+        Vector2f next = path.front();
+        Vector2f direction = Normalize(next - pos);
+        Vector2f side = Perpendicular(direction);
+        float radius = game.GetShipSettings().GetRadius();
+
+        float distance = next.Distance(pos);
+
+        // Rebuild the path if the bot isn't in line of sight of its next node.
+        CastResult center = RayCast(game.GetMap(), pos, direction, distance);
+        CastResult side1 =
+            RayCast(game.GetMap(), pos + side * radius, direction, distance);
+        CastResult side2 =
+            RayCast(game.GetMap(), pos - side * radius, direction, distance);
+
+        if (!center.hit && !side1.hit && !side2.hit) {
+          build = false;
+        }
+      }
+    }
+
+    if (build) {
+      path = ctx.bot->GetPathfinder().FindPath(from, to);
+
+      int ship = game.GetPlayer().ship;
+      float ship_radius = game.GetSettings().ShipSettings[ship].GetRadius();
+
+      path =
+          ctx.bot->GetPathfinder().SmoothPath(path, game.GetMap(), ship_radius);
+    }
+
+    return path;
+  }
+};
+
+class PatrolNode : public PathingNode {
  public:
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
     auto& game = ctx.bot->GetGame();
 
     Vector2f from = game.GetPosition();
-    // TODO: Implement list
-    Vector2f to(500, 615);
 
-    // Don't both recreating the path if the current path is this one.
-    auto existing_path =
-        ctx.blackboard.ValueOr("path", std::vector<Vector2f>());
-    if (!existing_path.empty() && existing_path.back().DistanceSq(to) < 3 * 3) {
-      return behavior::ExecuteResult::Success;
+    auto nodes =
+        ctx.blackboard.ValueOr("patrol_nodes", std::vector<Vector2f>());
+    auto index = ctx.blackboard.ValueOr("patrol_index", 0);
+
+    if (nodes.empty()) {
+      return behavior::ExecuteResult::Failure;
     }
 
-    std::vector<Vector2f> path = ctx.bot->GetPathfinder().FindPath(from, to);
+    Vector2f to = nodes.at(index);
 
-    float radius = game.GetShipSettings().GetRadius();
+    if (game.GetPosition().DistanceSq(to) < 3.0f * 3.0f) {
+      index = (index + 1) % nodes.size();
+      ctx.blackboard.Set("patrol_index", index);
+      to = nodes.at(index);
+    }
 
-    path = ctx.bot->GetPathfinder().SmoothPath(path, game.GetMap(), radius);
+    Path path = ctx.blackboard.ValueOr("path", Path());
+
+    path = CreatePath(ctx, "path", from, to);
 
     ctx.blackboard.Set("path", path);
 
@@ -253,7 +296,9 @@ class LookingAtEnemyNode : public behavior::BehaviorNode {
     float target_radius =
         game.GetSettings().ShipSettings[target.ship].GetRadius();
 
-    float nearby_radius = target_radius * 1.2f;
+    float aggression = ctx.blackboard.ValueOr("aggression", 0.0f);
+    float radius_multiplier = 1.0f + aggression * 1.0f;
+    float nearby_radius = target_radius * radius_multiplier;
 
     Vector2f box_min = target.position - Vector2f(nearby_radius, nearby_radius);
     Vector2f box_extent(nearby_radius * 2, nearby_radius * 2);
@@ -263,9 +308,16 @@ class LookingAtEnemyNode : public behavior::BehaviorNode {
     bool hit = RayBoxIntersect(bot_player.position, projectile_direction,
                                box_min, box_extent, &dist, &norm);
 
+    if (!hit) {
+      box_min = seek_position - Vector2f(nearby_radius, nearby_radius);
+      hit = RayBoxIntersect(bot_player.position, bot_player.GetHeading(),
+                            box_min, box_extent, &dist, &norm);
+    }
+
+    ctx.blackboard.Set("target_position", seek_position);
+
     if (hit) {
       if (CanShoot(game.GetMap(), bot_player, target)) {
-        ctx.blackboard.Set("target_position", seek_position);
         return behavior::ExecuteResult::Success;
       }
     }
@@ -277,13 +329,7 @@ class LookingAtEnemyNode : public behavior::BehaviorNode {
 class ShootEnemyNode : public behavior::BehaviorNode {
  public:
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
-    // if
-    // (ctx.target_player->position.DistanceSq(ctx.bot->GetGame().GetPosition())
-    // < 12 * 12) {
     ctx.bot->GetKeys().Press(VK_CONTROL);
-    //} else {
-    // ctx.bot->GetKeys().Press(VK_TAB);
-    //}
 
     return behavior::ExecuteResult::Success;
   }
@@ -292,8 +338,8 @@ class ShootEnemyNode : public behavior::BehaviorNode {
 class MoveToEnemyNode : public behavior::BehaviorNode {
  public:
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
-    float hover_distance = 23.0f;
-    float aggression_min = 7.0f;
+    float hover_distance = 30.0f;
+    float aggression_min = 15.0f;
 
     float aggression = ctx.blackboard.ValueOr("aggression", 0.0f);
     aggression += ctx.dt / 15.0f;
@@ -307,39 +353,54 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
 
     ctx.bot->Move(target_position, target_dist);
 
+    auto& game = ctx.bot->GetGame();
+
+    float proj_speed = game.GetShipSettings().BulletSpeed / 10.0f / 16.0f;
+    float radius = game.GetShipSettings().GetRadius() * 1.5f;
+    float max_speed = game.GetShipSettings().MaximumSpeed / 10.0f / 16.0f;
+
+    Vector2f box_pos = game.GetPosition() - Vector2f(radius, radius);
+
+    const Player& player =
+        *ctx.blackboard.ValueOr<const Player*>("target_player", nullptr);
+    Vector2f shoot_direction =
+        Normalize(player.velocity + (player.GetHeading() * proj_speed));
+    // Vector2f shoot_direction = player.GetHeading();
+
+    float dist;
+    if (LineBoxIntersect(player.position, shoot_direction, box_pos,
+                         Vector2f(radius * 2, radius * 2), &dist, nullptr)) {
+      Vector2f shoot_perp = Perpendicular(shoot_direction);
+      Vector2f box_hit = player.position + shoot_direction * dist;
+#if 0
+        // Move in the opposite direction of the hit on the hitbox.
+        Vector2f box_dodge_dir = Normalize(player.position - box_hit);
+        Vector2f dodge_dir = Normalize(shoot_perp * box_dodge_dir.Dot(shoot_perp));
+#else
+      Vector2f dodge_dir = Perpendicular(shoot_direction);
+#endif
+      // debug_log << "Dodging" << std::endl;
+
+      ctx.bot->GetSteering() += (dodge_dir * max_speed * 100.0f);
+      // ctx.bot->Move(game.GetPosition() + dodge_dir, 0.0f);
+    }
+
     return behavior::ExecuteResult::Success;
   }
 };
 
-class PathToEnemyNode : public behavior::BehaviorNode {
+class PathToEnemyNode : public PathingNode {
  public:
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
-    bool rebuild_path = true;
     auto& game = ctx.bot->GetGame();
 
     auto from = game.GetPosition();
     auto to = ctx.blackboard.ValueOr<const Player*>("target_player", nullptr)
                   ->position;
 
-    const auto& bot_path = ctx.bot->GetPath();
+    Path path = CreatePath(ctx, "path", from, to);
 
-    if (!bot_path.empty()) {
-      if (bot_path.back().DistanceSq(to) < 3 * 3) {
-        rebuild_path = false;
-      }
-    }
-
-    if (rebuild_path) {
-      std::vector<Vector2f> path = ctx.bot->GetPathfinder().FindPath(from, to);
-
-      int ship = game.GetPlayer().ship;
-      float ship_radius = game.GetSettings().ShipSettings[ship].GetRadius();
-
-      path =
-          ctx.bot->GetPathfinder().SmoothPath(path, game.GetMap(), ship_radius);
-
-      ctx.blackboard.Set("path", path);
-    }
+    ctx.blackboard.Set("path", path);
 
     return behavior::ExecuteResult::Success;
   }
@@ -353,13 +414,18 @@ class FollowPathNode : public behavior::BehaviorNode {
 
     if (path.empty()) return behavior::ExecuteResult::Failure;
 
-    auto position = ctx.bot->GetGame().GetPosition();
-
+    auto& game = ctx.bot->GetGame();
     Vector2f current = path.front();
 
-    while (current.DistanceSq(position) < 2 && !path.empty()) {
+    while (path.size() > 1 &&
+           CanMoveBetween(game, game.GetPosition(), path.at(1))) {
       path.erase(path.begin());
       current = path.front();
+    }
+
+    if (path.size() == 1 &&
+        path.front().DistanceSq(game.GetPosition()) < 2 * 2) {
+      path.clear();
     }
 
     if (path.size() != path_size) {
@@ -370,10 +436,28 @@ class FollowPathNode : public behavior::BehaviorNode {
 
     return behavior::ExecuteResult::Success;
   }
+
+ private:
+  bool CanMoveBetween(GameProxy& game, Vector2f from, Vector2f to) {
+    Vector2f trajectory = to - from;
+    Vector2f direction = Normalize(trajectory);
+    Vector2f side = Perpendicular(direction);
+
+    float distance = from.Distance(to);
+    float radius = game.GetShipSettings().GetRadius();
+
+    CastResult center = RayCast(game.GetMap(), from, direction, distance);
+    CastResult side1 =
+        RayCast(game.GetMap(), from + side * radius, direction, distance);
+    CastResult side2 =
+        RayCast(game.GetMap(), from - side * radius, direction, distance);
+
+    return !center.hit && !side1.hit && !side2.hit;
+  }
 };
 
 Bot::Bot(std::unique_ptr<GameProxy> game) : game_(std::move(game)) {
-  auto processor = std::make_unique<path::NodeProcessor>(game_->GetMap());
+  auto processor = std::make_unique<path::NodeProcessor>(*game_);
 
   last_ship_change_ = 0;
   ship_ = game_->GetPlayer().ship;
@@ -407,7 +491,7 @@ Bot::Bot(std::unique_ptr<GameProxy> game) : game_(std::move(game)) {
 
   auto shoot_sequence = std::make_unique<behavior::SequenceNode>(
       looking_at_enemy.get(), shoot_enemy.get());
-  auto parallel_shoot_enemy = std::make_unique<behavior::SequenceNode>(
+  auto parallel_shoot_enemy = std::make_unique<behavior::ParallelNode>(
       shoot_sequence.get(), move_to_enemy.get());
   auto los_shoot_conditional = std::make_unique<behavior::SequenceNode>(
       target_in_los.get(), parallel_shoot_enemy.get());
@@ -449,6 +533,12 @@ Bot::Bot(std::unique_ptr<GameProxy> game) : game_(std::move(game)) {
       std::make_unique<behavior::BehaviorEngine>(behavior_nodes_.back().get());
 
   regions_ = RegionRegistry::Create(game_->GetMap());
+
+  behavior_ctx_.blackboard.Set(
+      "patrol_nodes",
+      std::vector<Vector2f>({Vector2f(585, 540), Vector2f(400, 570)}));
+
+  behavior_ctx_.blackboard.Set("patrol_index", 0);
 }
 
 void Bot::Update(float dt) {
@@ -483,7 +573,6 @@ void Bot::Update(float dt) {
 
   behavior_ctx_.bot = this;
   behavior_ctx_.dt = dt;
-  behavior_ctx_.blackboard.Clear();
   behavior_ctx_.blackboard.Set("path", path_);
 
   behavior_->Update(behavior_ctx_);
@@ -495,9 +584,9 @@ void Bot::Update(float dt) {
 
 void Bot::Steer() {
   if (steering_.LengthSq() <= 0.0f) return;
+  // debug_log << "Steering: " << steering_ << std::endl;
 
   Vector2f trajectory = steering_ - game_->GetPlayer().velocity;
-  Vector2f target = game_->GetPosition() + trajectory;
   Vector2f direction = marvin::Normalize(trajectory);
   Vector2f heading = game_->GetPlayer().GetHeading();
 
@@ -505,8 +594,13 @@ void Bot::Steer() {
   auto perp = marvin::Perpendicular(heading);
   float dot = heading.Dot(direction);
   bool clockwise = perp.Dot(direction) >= 0.0;
+  bool target_behind = steering_.Dot(Normalize(trajectory)) < 0.0f;
 
-  float threshold = 0.75f;
+  float threshold = 0.15f;
+
+  if (target_behind) {
+    clockwise = !clockwise;
+  }
 
   if (dot < -threshold) {
     keys_.Press(VK_DOWN);
@@ -524,12 +618,12 @@ void Bot::Move(const Vector2f& target, float target_distance) {
   const Player& bot_player = game_->GetPlayer();
   Vector2f seek = target - game_->GetPosition();
   float distance = bot_player.position.Distance(target);
+  float maxspeed = game_->GetShipSettings().InitialSpeed / 10.0f / 16.0f;
 
   if (distance > target_distance) {
-    float maxspeed = game_->GetShipSettings().InitialSpeed / 10.0f / 16.0f;
     this->steering_ += Normalize(seek) * maxspeed;
   } else {
-    this->steering_ -= Normalize(seek) * target_distance - distance;
+    this->steering_ -= Normalize(bot_player.GetHeading()) * maxspeed;
   }
 }
 

@@ -97,9 +97,7 @@ HWND GetMainWindow() {
 }
 
 marvin::Bot& CreateBot() {
-  auto proxy = std::make_unique<marvin::ContinuumGameProxy>();
-
-  proxy->SetWindow(g_hWnd);
+  auto proxy = std::make_unique<marvin::ContinuumGameProxy>(g_hWnd);
 
   g_Bot = std::make_unique<marvin::Bot>(std::move(proxy));
 
@@ -111,9 +109,13 @@ extern "C" __declspec(dllexport) void InitializeMarvin() {
 
   marvin::debug_log.open("marvin.log", std::ios::out | std::ios::app);
 
-  marvin::debug_log << "Starting marvin.\n";
-
-  CreateBot();
+  marvin::debug_log << "Starting Marvin.\n";
+  
+  try {
+    CreateBot();
+  } catch (std::exception & e) {
+    MessageBox(NULL, e.what(), "A", MB_OK);
+  }
 
   DetourRestoreAfterWith();
 
@@ -122,8 +124,10 @@ extern "C" __declspec(dllexport) void InitializeMarvin() {
   DetourAttach(&(PVOID&)RealGetAsyncKeyState, OverrideGetAsyncKeyState);
   DetourAttach(&(PVOID&)RealPeekMessageA, OverridePeekMessageA);
   DetourTransactionCommit();
-
+  
   SetWindowText(g_hWnd, kEnabledText);
+
+  marvin::debug_log << "Marvin started successfully." << std::endl;
 }
 
 extern "C" __declspec(dllexport) void CleanupMarvin() {
@@ -135,7 +139,11 @@ extern "C" __declspec(dllexport) void CleanupMarvin() {
 
   SetWindowText(g_hWnd, "Continuum");
 
+  marvin::debug_log << "Shutting down Marvin." << std::endl;
+
   g_Bot = nullptr;
+
+  marvin::debug_log.close();
 }
 
 BOOL WINAPI DllMain(HINSTANCE hInst, DWORD dwReason, LPVOID reserved) {
