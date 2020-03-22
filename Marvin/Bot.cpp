@@ -233,6 +233,7 @@ class FindEnemyNode : public behavior::BehaviorNode {
     if (target.id == game.GetPlayer().id) return false;
     if (target.ship > 7) return false;
     if (target.frequency == game.GetPlayer().frequency) return false;
+    if (target.name[0] == '<') return false;
 
     if (game.GetMap().GetTileId(target.position) == marvin::kSafeTileId) {
       return false;
@@ -344,6 +345,10 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
     float aggression = ctx.blackboard.ValueOr("aggression", 0.0f);
     aggression += ctx.dt / 15.0f;
 
+    if (aggression > 1.0f) {
+      aggression = 1.0f;
+    }
+
     ctx.blackboard.Set("aggression", aggression);
     Vector2f target_position =
         ctx.blackboard.ValueOr("target_position", Vector2f());
@@ -355,37 +360,75 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
 
     auto& game = ctx.bot->GetGame();
 
-    float proj_speed = game.GetShipSettings().BulletSpeed / 10.0f / 16.0f;
-    float radius = game.GetShipSettings().GetRadius() * 1.5f;
     float max_speed = game.GetShipSettings().MaximumSpeed / 10.0f / 16.0f;
 
-    Vector2f box_pos = game.GetPosition() - Vector2f(radius, radius);
-
-    const Player& player =
+    const Player& shooter =
         *ctx.blackboard.ValueOr<const Player*>("target_player", nullptr);
-    Vector2f shoot_direction =
-        Normalize(player.velocity + (player.GetHeading() * proj_speed));
-    // Vector2f shoot_direction = player.GetHeading();
 
-    float dist;
-    if (LineBoxIntersect(player.position, shoot_direction, box_pos,
-                         Vector2f(radius * 2, radius * 2), &dist, nullptr)) {
-      Vector2f shoot_perp = Perpendicular(shoot_direction);
-      Vector2f box_hit = player.position + shoot_direction * dist;
-#if 0
-        // Move in the opposite direction of the hit on the hitbox.
-        Vector2f box_dodge_dir = Normalize(player.position - box_hit);
-        Vector2f dodge_dir = Normalize(shoot_perp * box_dodge_dir.Dot(shoot_perp));
-#else
-      Vector2f dodge_dir = Perpendicular(shoot_direction);
-#endif
-      // debug_log << "Dodging" << std::endl;
+    float dodge_dist_sq = (target_dist * 0.35f) * (target_dist * 0.35f);
 
-      ctx.bot->GetSteering() += (dodge_dir * max_speed * 100.0f);
-      // ctx.bot->Move(game.GetPosition() + dodge_dir, 0.0f);
+    if (game.GetPlayer().position.DistanceSq(shooter.position) > dodge_dist_sq) {
+      Vector2f dodge;
+
+      if (IsAimingAt(game, shooter, game.GetPlayer(), &dodge)) {
+        ctx.bot->GetSteering().Seek(game.GetPosition() + dodge, 100.0f);
+        return behavior::ExecuteResult::Success;
+      }
+    }
+
+    Vector2f heading = game.GetPlayer().GetHeading();
+
+    float dot = heading.Dot(Normalize(shooter.position - game.GetPosition()));
+
+    if (dot < 0.35f) {
+      ctx.bot->GetSteering().Face(target_position);
     }
 
     return behavior::ExecuteResult::Success;
+  }
+
+ private:
+  bool IsAimingAt(GameProxy& game, const Player& shooter, const Player& target,
+                  Vector2f* dodge) {
+    float proj_speed =
+        game.GetShipSettings(shooter.ship).BulletSpeed / 10.0f / 16.0f;
+    float radius = game.GetShipSettings(target.ship).GetRadius() * 1.5f;
+    Vector2f box_pos = target.position - Vector2f(radius, radius);
+
+    Vector2f shoot_direction =
+        Normalize(shooter.velocity + (shooter.GetHeading() * proj_speed));
+
+    if (shoot_direction.Dot(shooter.GetHeading()) < 0) {
+      shoot_direction = shooter.GetHeading();
+    }
+
+    Vector2f extent(radius * 2, radius * 2);
+
+    float shooter_radius = game.GetShipSettings(shooter.ship).GetRadius();
+    Vector2f side = Perpendicular(shooter.GetHeading()) * shooter_radius * 1.5f;
+
+    float distance;
+
+    if (RayBoxIntersect(shooter.position, shoot_direction, box_pos, extent,
+                         &distance, nullptr) ||
+        RayBoxIntersect(shooter.position + side,
+                         shoot_direction, box_pos, extent, &distance,
+                         nullptr) ||
+        RayBoxIntersect(shooter.position - side,
+                         shoot_direction, box_pos, extent, &distance,
+                         nullptr)) {
+#if 0
+      Vector2f hit = shooter.position + shoot_direction * distance;
+
+      *dodge = Normalize(side * side.Dot(Normalize(hit - target.position)));
+#else
+      *dodge = Perpendicular(shoot_direction);
+#endif
+
+      return true;
+    }
+
+    return false;
   }
 };
 
@@ -456,7 +499,8 @@ class FollowPathNode : public behavior::BehaviorNode {
   }
 };
 
-Bot::Bot(std::unique_ptr<GameProxy> game) : game_(std::move(game)) {
+Bot::Bot(std::unique_ptr<GameProxy> game)
+    : game_(std::move(game)), steering_(this) {
   auto processor = std::make_unique<path::NodeProcessor>(*game_);
 
   last_ship_change_ = 0;
@@ -569,7 +613,7 @@ void Bot::Update(float dt) {
     return;
   }
 
-  this->steering_ = Vector2f();
+  steering_.Reset();
 
   behavior_ctx_.bot = this;
   behavior_ctx_.dt = dt;
@@ -583,47 +627,55 @@ void Bot::Update(float dt) {
 }
 
 void Bot::Steer() {
-  if (steering_.LengthSq() <= 0.0f) return;
-  // debug_log << "Steering: " << steering_ << std::endl;
+  Vector2f force = steering_.GetSteering();
+  float rotation = steering_.GetRotation();
 
-  Vector2f trajectory = steering_ - game_->GetPlayer().velocity;
-  Vector2f direction = marvin::Normalize(trajectory);
   Vector2f heading = game_->GetPlayer().GetHeading();
 
-  // Simple movement controller
-  auto perp = marvin::Perpendicular(heading);
-  float dot = heading.Dot(direction);
-  bool clockwise = perp.Dot(direction) >= 0.0;
-  bool target_behind = steering_.Dot(Normalize(trajectory)) < 0.0f;
-
-  float threshold = 0.15f;
-
-  if (target_behind) {
-    clockwise = !clockwise;
+  if (rotation != 0.0f) {
+    float speed = game_->GetShipSettings().MaximumSpeed / 10.0f / 16.0f;
+    force += Rotate(heading, rotation) * speed * 0.2f;
   }
 
-  if (dot < -threshold) {
-    keys_.Press(VK_DOWN);
-  } else if (dot > threshold) {
-    keys_.Press(VK_UP);
-  }
+  if (force.LengthSq() > 0.0f) {
+    Vector2f direction = marvin::Normalize(force);
 
-  if (dot < 1.0f) {
-    keys_.Set(VK_RIGHT, clockwise);
-    keys_.Set(VK_LEFT, !clockwise);
+    // Simple movement controller
+    auto perp = marvin::Perpendicular(heading);
+    float dot = heading.Dot(direction);
+    bool clockwise = perp.Dot(direction) >= 0.0;
+    bool target_behind = force.Dot(direction) < 0.0f;
+    
+    float threshold = 0.15f;
+
+    if (target_behind) {
+      clockwise = !clockwise;
+    }
+
+    if (dot < -threshold) {
+      keys_.Press(VK_DOWN);
+    } else if (dot > threshold) {
+      keys_.Press(VK_UP);
+    }
+
+    if (dot < 1.0f) {
+      keys_.Set(VK_RIGHT, clockwise);
+      keys_.Set(VK_LEFT, !clockwise);
+    }
   }
 }
 
 void Bot::Move(const Vector2f& target, float target_distance) {
   const Player& bot_player = game_->GetPlayer();
-  Vector2f seek = target - game_->GetPosition();
   float distance = bot_player.position.Distance(target);
-  float maxspeed = game_->GetShipSettings().InitialSpeed / 10.0f / 16.0f;
 
   if (distance > target_distance) {
-    this->steering_ += Normalize(seek) * maxspeed;
+    steering_.Seek(target);
   } else {
-    this->steering_ -= Normalize(bot_player.GetHeading()) * maxspeed;
+    Vector2f to_target = target - bot_player.position;
+
+    steering_.Seek(target -
+                   Normalize(to_target) * (target_distance - distance));
   }
 }
 

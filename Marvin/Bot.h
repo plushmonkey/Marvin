@@ -5,6 +5,7 @@
 
 #include "KeyController.h"
 #include "RegionRegistry.h"
+#include "Steering.h"
 #include "behavior/BehaviorEngine.h"
 #include "path/Pathfinder.h"
 
@@ -30,7 +31,7 @@ class Bot {
   const std::vector<Vector2f>& GetPath() const { return path_; }
   const RegionRegistry& GetRegions() const { return *regions_; }
 
-  Vector2f& GetSteering() { return steering_; }
+  SteeringBehavior& GetSteering() { return steering_; }
 
  private:
   void Steer();
@@ -43,10 +44,10 @@ class Bot {
   behavior::ExecuteContext behavior_ctx_;
   int ship_;
   uint64_t last_ship_change_;
+  SteeringBehavior steering_;
 
   std::vector<std::unique_ptr<behavior::BehaviorNode>> behavior_nodes_;
 
-  Vector2f steering_;
   // TODO: Action-key map would be more versatile
   KeyController keys_;
 };

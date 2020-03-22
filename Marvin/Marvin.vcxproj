@@ -159,6 +159,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="RayCaster.cpp" />
     <ClCompile Include="RegionRegistry.cpp" />
+    <ClCompile Include="Steering.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="behavior\BehaviorEngine.h" />
@@ -180,6 +181,7 @@
     <ClInclude Include="Player.h" />
     <ClInclude Include="RayCaster.h" />
     <ClInclude Include="RegionRegistry.h" />
+    <ClInclude Include="Steering.h" />
     <ClInclude Include="Types.h" />
     <ClInclude Include="Vector2f.h" />
   </ItemGroup>

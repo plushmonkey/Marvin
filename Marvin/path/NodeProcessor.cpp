@@ -44,7 +44,7 @@ NodeConnections NodeProcessor::FindEdges(Node* node, Node* start, Node* goal) {
 
       if (current != nullptr) {
         if (map_.GetTileId(point.x, point.y) == kSafeTileId) {
-          current->weight = 150.0f;
+          current->weight = 10.0f;
         }
         connections.neighbors[connections.count++] = current;
 

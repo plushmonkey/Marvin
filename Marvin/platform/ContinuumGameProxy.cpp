@@ -109,6 +109,10 @@ const ShipSettings& ContinuumGameProxy::GetShipSettings() const {
   return GetSettings().ShipSettings[player_->ship];
 }
 
+const ShipSettings& ContinuumGameProxy::GetShipSettings(int ship) const {
+  return GetSettings().ShipSettings[ship];
+}
+
 std::string ContinuumGameProxy::GetName() const {
   const std::size_t ProfileStructSize = 2860;
 

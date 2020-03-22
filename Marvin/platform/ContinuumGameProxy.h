@@ -20,6 +20,7 @@ class ContinuumGameProxy : public GameProxy {
   const std::vector<Player>& GetPlayers() const override;
   const ClientSettings& GetSettings() const override;
   const ShipSettings& GetShipSettings() const override;
+  const ShipSettings& GetShipSettings(int ship) const override;
   std::string GetServerFolder() const;
   const Map& GetMap() const override;
   const Player& GetPlayer() const override;

@@ -23,6 +23,7 @@ class GameProxy {
   virtual const std::vector<Player>& GetPlayers() const = 0;
   virtual const ClientSettings& GetSettings() const = 0;
   virtual const ShipSettings& GetShipSettings() const = 0;
+  virtual const ShipSettings& GetShipSettings(int ship) const = 0;
   virtual const Map& GetMap() const = 0;
   virtual const Player& GetPlayer() const = 0;
 
