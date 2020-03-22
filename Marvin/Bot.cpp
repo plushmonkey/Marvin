@@ -181,10 +181,8 @@ class InLineOfSightNode : public behavior::BehaviorNode {
 class FindEnemyNode : public behavior::BehaviorNode {
  public:
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
-    const float kRotationMultiplier = 2.0f;
-
     behavior::ExecuteResult result = behavior::ExecuteResult::Failure;
-    float closest_distance = std::numeric_limits<float>::max();
+    float closest_cost = std::numeric_limits<float>::max();
     auto& game = ctx.bot->GetGame();
     const Player* target = nullptr;
     const Player& bot_player = ctx.bot->GetGame().GetPlayer();
@@ -198,14 +196,10 @@ class FindEnemyNode : public behavior::BehaviorNode {
 
       if (!IsValidTarget(ctx, player)) continue;
 
-      Vector2f direction = Normalize(player.position - bot_player.position);
-      float dot = bot_player.GetHeading().Dot(direction);
-      float dist = game.GetPlayer().position.Distance(player.position);
-      float multiplier = 1.0f + ((1.0f - dot) / kRotationMultiplier);
-      float calc = dist * multiplier;
+      float cost = CalculateCost(bot_player, player);
 
-      if (calc < closest_distance) {
-        closest_distance = calc;
+      if (cost < closest_cost) {
+        closest_cost = cost;
         target = &game.GetPlayers()[i];
         result = behavior::ExecuteResult::Success;
       }
@@ -213,6 +207,16 @@ class FindEnemyNode : public behavior::BehaviorNode {
 
     const Player* current_target =
         ctx.blackboard.ValueOr<const Player*>("target_player", nullptr);
+
+    if (current_target) {
+      // Calculate the cost to the current target so there's some stickiness
+      // between close targets.
+      float cost = CalculateCost(bot_player, *current_target);
+
+      if (cost * 1.2f < closest_cost) {
+        target = current_target;
+      }
+    }
 
     if (current_target != target) {
       ctx.blackboard.Set("aggression", 0.0f);
@@ -226,6 +230,16 @@ class FindEnemyNode : public behavior::BehaviorNode {
   }
 
  private:
+  float CalculateCost(const Player& bot_player, const Player& target) {
+    const float kRotationMultiplier = 2.0f;
+    Vector2f direction = Normalize(target.position - bot_player.position);
+    float dot = bot_player.GetHeading().Dot(direction);
+    float dist = bot_player.position.Distance(target.position);
+    float multiplier = 1.0f + ((1.0f - dot) / kRotationMultiplier);
+
+    return dist * multiplier;
+  }
+
   bool IsValidTarget(behavior::ExecuteContext& ctx, const Player& target) {
     const auto& game = ctx.bot->GetGame();
     const Player& bot_player = game.GetPlayer();
@@ -356,6 +370,14 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
     float target_dist =
         hover_distance - (aggression * (hover_distance - aggression_min));
 
+    MapCoord spawn =
+        ctx.bot->GetGame().GetSettings().SpawnSettings[0].GetCoord();
+
+    if (Vector2f(spawn.x, spawn.y)
+            .DistanceSq(ctx.bot->GetGame().GetPosition()) < 35.0f * 35.0f) {
+      target_dist = 0.0f;
+    }
+
     ctx.bot->Move(target_position, target_dist);
 
     auto& game = ctx.bot->GetGame();
@@ -367,7 +389,8 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
 
     float dodge_dist_sq = (target_dist * 0.35f) * (target_dist * 0.35f);
 
-    if (game.GetPlayer().position.DistanceSq(shooter.position) > dodge_dist_sq) {
+    if (game.GetPlayer().position.DistanceSq(shooter.position) >
+        dodge_dist_sq) {
       Vector2f dodge;
 
       if (IsAimingAt(game, shooter, game.GetPlayer(), &dodge)) {
@@ -410,13 +433,11 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
     float distance;
 
     if (RayBoxIntersect(shooter.position, shoot_direction, box_pos, extent,
-                         &distance, nullptr) ||
-        RayBoxIntersect(shooter.position + side,
-                         shoot_direction, box_pos, extent, &distance,
-                         nullptr) ||
-        RayBoxIntersect(shooter.position - side,
-                         shoot_direction, box_pos, extent, &distance,
-                         nullptr)) {
+                        &distance, nullptr) ||
+        RayBoxIntersect(shooter.position + side, shoot_direction, box_pos,
+                        extent, &distance, nullptr) ||
+        RayBoxIntersect(shooter.position - side, shoot_direction, box_pos,
+                        extent, &distance, nullptr)) {
 #if 0
       Vector2f hit = shooter.position + shoot_direction * distance;
 
@@ -645,7 +666,7 @@ void Bot::Steer() {
     float dot = heading.Dot(direction);
     bool clockwise = perp.Dot(direction) >= 0.0;
     bool target_behind = force.Dot(direction) < 0.0f;
-    
+
     float threshold = 0.15f;
 
     if (target_behind) {
