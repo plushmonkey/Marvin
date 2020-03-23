@@ -350,11 +350,89 @@ class ShootEnemyNode : public behavior::BehaviorNode {
   }
 };
 
+class BundleShots : public behavior::BehaviorNode {
+ public:
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
+    const uint64_t cooldown = 5000;
+    const uint64_t duration = 1500;
+
+    uint64_t bundle_expire =
+        ctx.blackboard.ValueOr<uint64_t>("BundleCooldownExpire", 0);
+    uint64_t current_time = ctx.bot->GetTime();
+
+    if (current_time < bundle_expire) return behavior::ExecuteResult::Failure;
+
+    if (running_ && current_time >= start_time_ + duration) {
+      ctx.blackboard.Set("BundleCooldownExpire", current_time + cooldown + (rand() % 1000));
+      running_ = false;
+      return behavior::ExecuteResult::Success;
+    }
+
+    auto& game = ctx.bot->GetGame();
+
+    Vector2f target_position =
+        ctx.blackboard.ValueOr("target_position", Vector2f());
+    const Player& target =
+        *ctx.blackboard.ValueOr<const Player*>("target_player", nullptr);
+
+    if (!running_) {
+      if (!ShouldActivate(ctx, target)) {
+        return behavior::ExecuteResult::Failure;
+      }
+
+      start_time_ = current_time;
+      running_ = true;
+    }
+
+    ctx.bot->Move(target_position, 0.0f);
+    ctx.bot->GetSteering().Face(target_position);
+
+    ctx.bot->GetKeys().Press(VK_UP);
+    ctx.bot->GetKeys().Press(VK_CONTROL);
+
+    return behavior::ExecuteResult::Running;
+  }
+
+ private:
+  bool ShouldActivate(behavior::ExecuteContext& ctx, const Player& target) {
+    auto& game = ctx.bot->GetGame();
+    Vector2f position = game.GetPosition();
+    Vector2f velocity = game.GetPlayer().velocity;
+    Vector2f relative_velocity = velocity - target.velocity;
+    float dot = game.GetPlayer().GetHeading().Dot(
+        Normalize(target.position - position));
+
+    if (game.GetMap().GetTileId(game.GetPosition()) == kSafeTileId) {
+      return false;
+    }
+
+    if (dot <= 0.7f) {
+      return false;
+    }
+
+    if (relative_velocity.LengthSq() < 1.0f * 1.0f) {
+      return true;
+    }
+
+    // Activate this if pointing near the target and moving away from them.
+    if (game.GetPlayer().velocity.Dot(target.position - position) >= 0.0f) {
+      return false;
+    }
+
+    return true;
+  }
+
+  uint64_t start_time_;
+  bool running_;
+};
+
 class MoveToEnemyNode : public behavior::BehaviorNode {
  public:
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
-    float hover_distance = 30.0f;
-    float aggression_min = 15.0f;
+    const float hover_distance = 45.0f;
+    const float aggression_min = 15.0f;
+
+    auto& game = ctx.bot->GetGame();
 
     float aggression = ctx.blackboard.ValueOr("aggression", 0.0f);
     aggression += ctx.dt / 15.0f;
@@ -367,27 +445,33 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
     Vector2f target_position =
         ctx.blackboard.ValueOr("target_position", Vector2f());
 
-    float target_dist =
+    float distance_min =
         hover_distance - (aggression * (hover_distance - aggression_min));
+    float distance_max = hover_distance * 1.2f;
 
     MapCoord spawn =
         ctx.bot->GetGame().GetSettings().SpawnSettings[0].GetCoord();
 
     if (Vector2f(spawn.x, spawn.y)
             .DistanceSq(ctx.bot->GetGame().GetPosition()) < 35.0f * 35.0f) {
-      target_dist = 0.0f;
+      distance_min = 0.0f;
+      distance_max = 0.0f;
     }
 
-    ctx.bot->Move(target_position, target_dist);
+    float distance = target_position.Distance(game.GetPlayer().position);
 
-    auto& game = ctx.bot->GetGame();
+    if (distance < distance_min) {
+      ctx.bot->Move(target_position, distance_min);
+    } else if (distance > distance_max) {
+      ctx.bot->Move(target_position, hover_distance);
+    }
 
     float max_speed = game.GetShipSettings().MaximumSpeed / 10.0f / 16.0f;
 
     const Player& shooter =
         *ctx.blackboard.ValueOr<const Player*>("target_player", nullptr);
 
-    float dodge_dist_sq = (target_dist * 0.35f) * (target_dist * 0.35f);
+    float dodge_dist_sq = (distance_min * 0.35f) * (distance_min * 0.35f);
 
     if (game.GetPlayer().position.DistanceSq(shooter.position) >
         dodge_dist_sq) {
@@ -401,8 +485,8 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
 
     Vector2f heading = game.GetPlayer().GetHeading();
 
-    float dot = heading.Dot(Normalize(shooter.position - game.GetPosition()));
-
+    float dot = heading.Dot(Normalize(target_position - game.GetPosition()));
+    
     if (dot < 0.35f) {
       ctx.bot->GetSteering().Face(target_position);
     }
@@ -432,21 +516,25 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
 
     float distance;
 
-    if (RayBoxIntersect(shooter.position, shoot_direction, box_pos, extent,
-                        &distance, nullptr) ||
-        RayBoxIntersect(shooter.position + side, shoot_direction, box_pos,
-                        extent, &distance, nullptr) ||
-        RayBoxIntersect(shooter.position - side, shoot_direction, box_pos,
-                        extent, &distance, nullptr)) {
-#if 0
-      Vector2f hit = shooter.position + shoot_direction * distance;
+    Vector2f directions[2] = {shoot_direction, shooter.GetHeading()};
 
-      *dodge = Normalize(side * side.Dot(Normalize(hit - target.position)));
+    for (Vector2f direction : directions) {
+      if (RayBoxIntersect(shooter.position, direction, box_pos, extent,
+                          &distance, nullptr) ||
+          RayBoxIntersect(shooter.position + side, direction, box_pos, extent,
+                          &distance, nullptr) ||
+          RayBoxIntersect(shooter.position - side, direction, box_pos, extent,
+                          &distance, nullptr)) {
+#if 0
+        Vector2f hit = shooter.position + shoot_direction * distance;
+
+        *dodge = Normalize(side * side.Dot(Normalize(hit - target.position)));
 #else
-      *dodge = Perpendicular(shoot_direction);
+        *dodge = Perpendicular(direction);
 #endif
 
-      return true;
+        return true;
+      }
     }
 
     return false;
@@ -553,11 +641,15 @@ Bot::Bot(std::unique_ptr<GameProxy> game)
   auto move_to_enemy = std::make_unique<MoveToEnemyNode>();
   auto follow_path = std::make_unique<FollowPathNode>();
   auto patrol = std::make_unique<PatrolNode>();
+  auto bundle_shots = std::make_unique<BundleShots>();
+
+  auto move_method_selector = std::make_unique<behavior::SelectorNode>(
+      bundle_shots.get(), move_to_enemy.get());
 
   auto shoot_sequence = std::make_unique<behavior::SequenceNode>(
       looking_at_enemy.get(), shoot_enemy.get());
   auto parallel_shoot_enemy = std::make_unique<behavior::ParallelNode>(
-      shoot_sequence.get(), move_to_enemy.get());
+      shoot_sequence.get(), move_method_selector.get());
   auto los_shoot_conditional = std::make_unique<behavior::SequenceNode>(
       target_in_los.get(), parallel_shoot_enemy.get());
 
@@ -584,7 +676,9 @@ Bot::Bot(std::unique_ptr<GameProxy> game)
   behavior_nodes_.push_back(std::move(move_to_enemy));
   behavior_nodes_.push_back(std::move(follow_path));
   behavior_nodes_.push_back(std::move(patrol));
+  behavior_nodes_.push_back(std::move(bundle_shots));
 
+  behavior_nodes_.push_back(std::move(move_method_selector));
   behavior_nodes_.push_back(std::move(shoot_sequence));
   behavior_nodes_.push_back(std::move(parallel_shoot_enemy));
   behavior_nodes_.push_back(std::move(los_shoot_conditional));
@@ -611,11 +705,7 @@ void Bot::Update(float dt) {
   game_->Update(dt);
 
   if (game_->GetPlayer().ship > 7) {
-    uint64_t timestamp =
-        std::chrono::time_point_cast<std::chrono::duration<uint64_t>>(
-            std::chrono::high_resolution_clock::now())
-            .time_since_epoch()
-            .count();
+    uint64_t timestamp = GetTime();
 
     if (timestamp - last_ship_change_ > 10) {
       if (game_->SetShip(ship_)) {
@@ -698,6 +788,13 @@ void Bot::Move(const Vector2f& target, float target_distance) {
     steering_.Seek(target -
                    Normalize(to_target) * (target_distance - distance));
   }
+}
+
+uint64_t Bot::GetTime() const {
+  return std::chrono::time_point_cast<std::chrono::milliseconds>(
+             std::chrono::high_resolution_clock::now())
+      .time_since_epoch()
+      .count();
 }
 
 }  // namespace marvin

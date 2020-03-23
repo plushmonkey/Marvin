@@ -33,6 +33,8 @@ class Bot {
 
   SteeringBehavior& GetSteering() { return steering_; }
 
+  uint64_t GetTime() const;
+
  private:
   void Steer();
 
