@@ -196,7 +196,7 @@ class FindEnemyNode : public behavior::BehaviorNode {
 
       if (!IsValidTarget(ctx, player)) continue;
 
-      float cost = CalculateCost(bot_player, player);
+      float cost = CalculateCost(game, bot_player, player);
 
       if (cost < closest_cost) {
         closest_cost = cost;
@@ -211,9 +211,10 @@ class FindEnemyNode : public behavior::BehaviorNode {
     if (current_target) {
       // Calculate the cost to the current target so there's some stickiness
       // between close targets.
-      float cost = CalculateCost(bot_player, *current_target);
+      const float kStickiness = 2.0f;
+      float cost = CalculateCost(game, bot_player, *current_target);
 
-      if (cost * 1.2f < closest_cost) {
+      if (cost * kStickiness < closest_cost) {
         target = current_target;
       }
     }
@@ -230,14 +231,18 @@ class FindEnemyNode : public behavior::BehaviorNode {
   }
 
  private:
-  float CalculateCost(const Player& bot_player, const Player& target) {
-    const float kRotationMultiplier = 2.0f;
-    Vector2f direction = Normalize(target.position - bot_player.position);
-    float dot = bot_player.GetHeading().Dot(direction);
+  float CalculateCost(GameProxy& game, const Player& bot_player,
+                      const Player& target) {
     float dist = bot_player.position.Distance(target.position);
-    float multiplier = 1.0f + ((1.0f - dot) / kRotationMultiplier);
+    // How many seconds it takes to rotate 180 degrees
+    float rotate_speed = game.GetShipSettings().MaximumRotation / 200.0f;
+    float move_cost =
+        dist / (game.GetShipSettings().MaximumSpeed / 10.0f / 16.0f);
+    Vector2f direction = Normalize(target.position - bot_player.position);
+    float dot = std::abs(bot_player.GetHeading().Dot(direction) - 1.0f) / 2.0f;
+    float rotate_cost = std::abs(dot) * rotate_speed;
 
-    return dist * multiplier;
+    return move_cost + rotate_cost;
   }
 
   bool IsValidTarget(behavior::ExecuteContext& ctx, const Player& target) {
@@ -363,7 +368,8 @@ class BundleShots : public behavior::BehaviorNode {
     if (current_time < bundle_expire) return behavior::ExecuteResult::Failure;
 
     if (running_ && current_time >= start_time_ + duration) {
-      ctx.blackboard.Set("BundleCooldownExpire", current_time + cooldown + (rand() % 1000));
+      ctx.blackboard.Set("BundleCooldownExpire",
+                         current_time + cooldown + (rand() % 1000));
       running_ = false;
       return behavior::ExecuteResult::Success;
     }
@@ -486,7 +492,7 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
     Vector2f heading = game.GetPlayer().GetHeading();
 
     float dot = heading.Dot(Normalize(target_position - game.GetPosition()));
-    
+
     if (dot < 0.35f) {
       ctx.bot->GetSteering().Face(target_position);
     }
@@ -707,7 +713,7 @@ void Bot::Update(float dt) {
   if (game_->GetPlayer().ship > 7) {
     uint64_t timestamp = GetTime();
 
-    if (timestamp - last_ship_change_ > 10) {
+    if (timestamp - last_ship_change_ > 10000) {
       if (game_->SetShip(ship_)) {
         last_ship_change_ = timestamp;
       }
