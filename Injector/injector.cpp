@@ -290,6 +290,16 @@ class ContinuumGameProxy : public GameProxy {
 
 }  // namespace marvin
 
+std::string Lowercase(const std::string& str) {
+  std::string result;
+
+  result.resize(str.size());
+
+  std::transform(str.begin(), str.end(), result.begin(), ::tolower);
+
+  return result;
+}
+
 DWORD SelectPid(const std::vector<DWORD>& pids, std::string target_player) {
   std::transform(target_player.begin(), target_player.end(),
                  target_player.begin(), tolower);
@@ -347,6 +357,36 @@ DWORD SelectPid(const std::vector<DWORD>& pids) {
   return pids[selection - 1];
 }
 
+void InjectExcept(const std::vector<DWORD>& pids,
+                  const std::string& exception) {
+  std::string inject_path =
+      marvin::GetWorkingDirectory() + "\\" + INJECT_MODULE_NAME;
+
+  std::size_t count = 0;
+
+  std::string lower_exception = Lowercase(exception);
+
+  for (DWORD pid : pids) {
+    auto game =
+      marvin::ContinuumGameProxy(std::make_unique<marvin::Process>(pid));
+    auto& process = game.GetProcess();
+
+    std::string name = Lowercase(game.GetName());
+
+    if (name == lower_exception) continue;
+
+    if (process.HasModule(INJECT_MODULE_NAME)) {
+      continue;
+    }
+
+    if (process.InjectModule(inject_path)) {
+      ++count;
+    }
+  }
+
+  std::cout << "Successfully injected into " << count << " processes." << std::endl;
+}
+
 int main(int argc, char* argv[]) {
   if (!marvin::GetDebugPrivileges()) {
     std::cerr << "Failed to get debug privileges. Try running as Administrator."
@@ -375,6 +415,11 @@ int main(int argc, char* argv[]) {
       }
 
       target_player += argv[i];
+    }
+
+    if (!target_player.empty() && target_player[0] == '*') {
+      InjectExcept(continuum_pids, target_player.substr(1));
+      return EXIT_SUCCESS;
     }
 
     pid = SelectPid(continuum_pids, target_player);
