@@ -27,14 +27,15 @@ class ContinuumGameProxy : public GameProxy {
 
   bool SetShip(int ship) override;
   void Warp() override;
+  void Cloak(KeyController& keys) override;
 
   void SetWindowFocus();
 
   ExeProcess& GetProcess();
 
  private:
-  void FetchPlayers();
   void SendKey(int vKey);
+  void FetchPlayers();
 
   ExeProcess process_;
   HWND hwnd_;

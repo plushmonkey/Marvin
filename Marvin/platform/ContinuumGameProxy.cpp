@@ -50,6 +50,8 @@ void ContinuumGameProxy::FetchPlayers() {
   const std::size_t kFreqOffset = 0x58;
   const std::size_t kStatusOffset = 0x60;
   const std::size_t kNameOffset = 0x6D;
+  const std::size_t kEnergyOffset1 = 0x208;
+  const std::size_t kEnergyOffset2 = 0x20C;
 
   std::size_t base_addr = game_addr_ + 0x127EC;
   std::size_t players_addr = base_addr + 0x884;
@@ -90,6 +92,15 @@ void ContinuumGameProxy::FetchPlayers() {
         static_cast<uint8_t>(process_.ReadU32(player_addr + kStatusOffset));
 
     player.name = process_.ReadString(player_addr + kNameOffset, 23);
+
+    // Energy calculation @4485FA
+    u32 energy1 = process_.ReadU32(player_addr + kEnergyOffset1);
+    u32 energy2 = process_.ReadU32(player_addr + kEnergyOffset2);
+
+    u32 combined = energy1 + energy2;
+    u64 energy = ((combined * (u64)0x10624DD3) >> 32) >> 6;
+
+    player.energy = static_cast<uint16_t>(energy);
 
     players_.emplace_back(player);
 
@@ -172,6 +183,8 @@ bool ContinuumGameProxy::SetShip(int ship) {
 }
 
 void ContinuumGameProxy::Warp() { SendKey(VK_INSERT); }
+
+void ContinuumGameProxy::Cloak(KeyController& keys) { keys.Press(VK_SHIFT); SendKey(VK_HOME); }
 
 void ContinuumGameProxy::SetWindowFocus() {
   std::size_t focus_addr = game_addr_ + 0x3039c;

@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "KeyController.h"
 #include "ClientSettings.h"
 #include "Player.h"
 #include "Vector2f.h"
@@ -31,6 +32,7 @@ class GameProxy {
   // Returns true if it attempts to set the ship this call.
   virtual bool SetShip(int ship) = 0;
   virtual void Warp() = 0;
+  virtual void Cloak(KeyController& keys) = 0;
 };
 
 }  // namespace marvin
