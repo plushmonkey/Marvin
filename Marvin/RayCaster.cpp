@@ -81,8 +81,10 @@ CastResult RayCast(const Map& map, Vector2f from, Vector2f direction, float max_
 
   result.distance = max_length;
 
+  Vector2f from_base(std::floor(from.x), std::floor(from.y));
+
   for (float i = 0; i < max_length; ++i) {
-    Vector2f current = from + direction * i;
+    Vector2f current = from_base + direction * i;
 
     for (Vector2f check_direction : kDirections) {
       Vector2f check = current + check_direction;

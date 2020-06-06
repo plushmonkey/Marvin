@@ -67,8 +67,17 @@ class SelectorNode : public BehaviorNode {
 
   ExecuteResult Execute(ExecuteContext& ctx) override;
 
- private:
+ protected:
   std::vector<BehaviorNode*> children_;
+};
+
+class SuccessNode : public BehaviorNode {
+public:
+  SuccessNode(BehaviorNode* child);
+
+  ExecuteResult Execute(ExecuteContext& ctx) override;
+protected:
+  BehaviorNode* child_;
 };
 
 }  // namespace behavior

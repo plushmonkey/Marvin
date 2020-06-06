@@ -40,6 +40,7 @@ class Blackboard {
   }
 
   void Clear() { data_.clear(); }
+  void Erase(const std::string& key) { data_.erase(key); }
 
  private:
   std::unordered_map<std::string, std::any> data_;

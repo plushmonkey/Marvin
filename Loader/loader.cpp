@@ -3,6 +3,8 @@
 #endif
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <TlHelp32.h>
+#include <psapi.h>
 
 #include <iostream>
 #include <string>
@@ -16,6 +18,7 @@ typedef void(*CleanupFunc)();
 
 static HMODULE hModule = NULL;
 static std::string g_MarvinPath;
+static std::string g_MarvinDll;
 static std::string g_MarvinLoadedPath;
 static FILETIME g_LastTime;
 static std::thread g_MonitorThread;
@@ -51,6 +54,47 @@ bool GetLastWriteTime(const char* filename, FILETIME* ft) {
   return false;
 }
 
+bool WaitForUnload() {
+  DWORD pid = GetCurrentProcessId();
+  HANDLE hProcess = GetCurrentProcess();
+  HMODULE hMods[1024];
+  DWORD cbNeeded;
+
+  bool loaded = true;
+
+  int loops = 0;
+
+  while (loaded) {
+    loaded = false;
+
+    ++loops;
+
+    if (EnumProcessModules(hProcess, hMods, sizeof(hMods), &cbNeeded)) {
+      for (std::size_t i = 0; i < (cbNeeded / sizeof(HMODULE)); ++i) {
+        std::string module;
+
+        module.resize(MAX_PATH);
+
+        if (GetModuleFileNameEx(hProcess, hMods[i], &module[0], MAX_PATH)) {
+          if (module.find(g_MarvinLoadedPath) != std::string::npos) {
+            loaded = true;
+          }
+        }
+      }
+    }
+  }
+
+#if 0
+  if (loops > 1) {
+    std::string str = "Loops: " + std::to_string(loops);
+
+    MessageBox(NULL, str.c_str(), "A", MB_OK);
+  }
+#endif
+
+  return true;
+}
+
 void PerformReload() {
   if (hModule) {
     CleanupFunc cleanup = (CleanupFunc)GetProcAddress(hModule, "CleanupMarvin");
@@ -60,6 +104,8 @@ void PerformReload() {
     }
 
     FreeLibrary(hModule);
+
+    WaitForUnload();
   }
 
   hModule = NULL;
@@ -115,9 +161,9 @@ BOOL WINAPI DllMain(HINSTANCE hInst, DWORD dwReason, LPVOID reserved) {
     // Copy Marvin and load the temporary dll
 #ifdef DEV_SWAP
     DWORD pid = GetCurrentProcessId();
-    std::string tempname = "Marvin-" + std::to_string(pid) + ".dll";
+    g_MarvinDll = "Marvin-" + std::to_string(pid) + ".dll";
 
-    g_MarvinLoadedPath = GetFolderFilePath(hInst, tempname.c_str());
+    g_MarvinLoadedPath = GetFolderFilePath(hInst, g_MarvinDll.c_str());
 
     PerformReload();
     GetLastWriteTime(g_MarvinLoadedPath.c_str(), &g_LastTime);

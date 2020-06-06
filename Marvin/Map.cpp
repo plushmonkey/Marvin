@@ -40,6 +40,23 @@ TileId Map::GetTileId(const Vector2f& position) const {
   return GetTileId(x, y);
 }
 
+bool Map::CanOccupy(const Vector2f& position, float radius) const {
+  int radius_check = (int)(radius + 0.5f);
+
+  for (int y = -radius_check; y <= radius_check; ++y) {
+    for (int x = -radius_check; x <= radius_check; ++x) {
+      uint16_t world_x = (uint16_t)(position.x + x);
+      uint16_t world_y = (uint16_t)(position.y + y);
+
+      if (IsSolid(world_x, world_y)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 struct Tile {
   u32 x : 12;
   u32 y : 12;

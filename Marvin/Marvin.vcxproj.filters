@@ -60,6 +60,12 @@
     <ClCompile Include="Steering.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="hyperspace\Hyperspace.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="behavior\nodes\FollowPathNode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GameProxy.h">
@@ -126,6 +132,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Steering.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="hyperspace\Hyperspace.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="behavior\nodes\FollowPathNode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

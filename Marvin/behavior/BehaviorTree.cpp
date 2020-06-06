@@ -65,5 +65,12 @@ ExecuteResult SelectorNode::Execute(ExecuteContext& ctx) {
   return result;
 }
 
+SuccessNode::SuccessNode(BehaviorNode* child) : child_(child) { }
+
+ExecuteResult SuccessNode::Execute(ExecuteContext& ctx) {
+  child_->Execute(ctx);
+  return ExecuteResult::Success;
+}
+
 }  // namespace behavior
 }  // namespace marvin

@@ -8,9 +8,10 @@
 #include "Map.h"
 #include "RayCaster.h"
 #include "RegionRegistry.h"
+#include "behavior/nodes/FollowPathNode.h"
 #include "platform/Platform.h"
 
-namespace {
+namespace marvin {
 
 bool InRect(marvin::Vector2f pos, marvin::Vector2f min_rect,
             marvin::Vector2f max_rect) {
@@ -62,63 +63,6 @@ marvin::Vector2f CalculateShot(const marvin::Vector2f& pShooter,
   return solution;
 }
 
-}  // namespace
-
-namespace marvin {
-
-class PathingNode : public behavior::BehaviorNode {
- public:
-  using Path = std::vector<Vector2f>;
-
-  virtual behavior::ExecuteResult Execute(
-      behavior::ExecuteContext& ctx) override = 0;
-
- protected:
-  Path CreatePath(behavior::ExecuteContext& ctx, const std::string& pathname,
-                  Vector2f from, Vector2f to) {
-    bool build = true;
-    auto& game = ctx.bot->GetGame();
-
-    Path path = ctx.blackboard.ValueOr(pathname, Path());
-
-    if (!path.empty()) {
-      // Check if the current destination is the same as the requested one.
-      if (path.back().DistanceSq(to) < 3 * 3) {
-        Vector2f pos = game.GetPosition();
-        Vector2f next = path.front();
-        Vector2f direction = Normalize(next - pos);
-        Vector2f side = Perpendicular(direction);
-        float radius = game.GetShipSettings().GetRadius();
-
-        float distance = next.Distance(pos);
-
-        // Rebuild the path if the bot isn't in line of sight of its next node.
-        CastResult center = RayCast(game.GetMap(), pos, direction, distance);
-        CastResult side1 =
-            RayCast(game.GetMap(), pos + side * radius, direction, distance);
-        CastResult side2 =
-            RayCast(game.GetMap(), pos - side * radius, direction, distance);
-
-        if (!center.hit && !side1.hit && !side2.hit) {
-          build = false;
-        }
-      }
-    }
-
-    if (build) {
-      path = ctx.bot->GetPathfinder().FindPath(from, to);
-
-      int ship = game.GetPlayer().ship;
-      float ship_radius = game.GetSettings().ShipSettings[ship].GetRadius();
-
-      path =
-          ctx.bot->GetPathfinder().SmoothPath(path, game.GetMap(), ship_radius);
-    }
-
-    return path;
-  }
-};
-
 class PatrolNode : public PathingNode {
  public:
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
@@ -144,7 +88,8 @@ class PatrolNode : public PathingNode {
 
     Path path = ctx.blackboard.ValueOr("path", Path());
 
-    path = CreatePath(ctx, "path", from, to);
+    path =
+        CreatePath(ctx, "path", from, to, game.GetShipSettings().GetRadius());
 
     ctx.blackboard.Set("path", path);
 
@@ -176,115 +121,6 @@ class InLineOfSightNode : public behavior::BehaviorNode {
 
  private:
   VectorSelector selector_;
-};
-
-class FindEnemyNode : public behavior::BehaviorNode {
- public:
-  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
-    behavior::ExecuteResult result = behavior::ExecuteResult::Failure;
-    float closest_cost = std::numeric_limits<float>::max();
-    auto& game = ctx.bot->GetGame();
-    const Player* target = nullptr;
-    const Player& bot_player = ctx.bot->GetGame().GetPlayer();
-
-    Vector2f resolution(1920, 1080);
-    view_min_ = bot_player.position - resolution / 2.0f / 16.0f;
-    view_max_ = bot_player.position + resolution / 2.0f / 16.0f;
-
-    for (std::size_t i = 0; i < game.GetPlayers().size(); ++i) {
-      const marvin::Player& player = game.GetPlayers()[i];
-
-      if (!IsValidTarget(ctx, player)) continue;
-
-      float cost = CalculateCost(game, bot_player, player);
-
-      if (cost < closest_cost) {
-        closest_cost = cost;
-        target = &game.GetPlayers()[i];
-        result = behavior::ExecuteResult::Success;
-      }
-    }
-
-    const Player* current_target =
-        ctx.blackboard.ValueOr<const Player*>("target_player", nullptr);
-
-    if (current_target) {
-      // Calculate the cost to the current target so there's some stickiness
-      // between close targets.
-      const float kStickiness = 2.0f;
-      float cost = CalculateCost(game, bot_player, *current_target);
-
-      if (cost * kStickiness < closest_cost) {
-        target = current_target;
-      }
-    }
-
-    if (current_target != target) {
-      ctx.blackboard.Set("aggression", 0.0f);
-    }
-
-    ctx.blackboard.Set("target_player", target);
-    const Player* r =
-        ctx.blackboard.ValueOr<const Player*>("target_player", nullptr);
-
-    return result;
-  }
-
- private:
-  float CalculateCost(GameProxy& game, const Player& bot_player,
-                      const Player& target) {
-    float dist = bot_player.position.Distance(target.position);
-    // How many seconds it takes to rotate 180 degrees
-    float rotate_speed = game.GetShipSettings().MaximumRotation / 200.0f;
-    float move_cost =
-        dist / (game.GetShipSettings().MaximumSpeed / 10.0f / 16.0f);
-    Vector2f direction = Normalize(target.position - bot_player.position);
-    float dot = std::abs(bot_player.GetHeading().Dot(direction) - 1.0f) / 2.0f;
-    float rotate_cost = std::abs(dot) * rotate_speed;
-
-    return move_cost + rotate_cost;
-  }
-
-  bool IsValidTarget(behavior::ExecuteContext& ctx, const Player& target) {
-    const auto& game = ctx.bot->GetGame();
-    const Player& bot_player = game.GetPlayer();
-
-    if (target.id == game.GetPlayer().id) return false;
-    if (target.ship > 7) return false;
-    if (target.frequency == game.GetPlayer().frequency) return false;
-    if (target.name[0] == '<') return false;
-
-    if (game.GetMap().GetTileId(target.position) == marvin::kSafeTileId) {
-      return false;
-    }
-
-    if (!IsValidPosition(target.position)) {
-      return false;
-    }
-
-    MapCoord bot_coord(bot_player.position);
-    MapCoord target_coord(target.position);
-
-    if (!ctx.bot->GetRegions().IsConnected(bot_coord, target_coord)) {
-      return false;
-    }
-
-    bool stealthing = (target.status & 2) != 0;
-    bool cloaking = (target.status & 2) != 0;
-
-    if (!(game.GetPlayer().status & 4)) {
-      if (stealthing && cloaking) return false;
-
-      bool visible = InRect(target.position, view_min_, view_max_);
-
-      if (stealthing && !visible) return false;
-    }
-
-    return true;
-  }
-
-  Vector2f view_min_;
-  Vector2f view_max_;
 };
 
 class LookingAtEnemyNode : public behavior::BehaviorNode {
@@ -556,7 +392,8 @@ class PathToEnemyNode : public PathingNode {
     auto to = ctx.blackboard.ValueOr<const Player*>("target_player", nullptr)
                   ->position;
 
-    Path path = CreatePath(ctx, "path", from, to);
+    Path path =
+        CreatePath(ctx, "path", from, to, game.GetShipSettings().GetRadius());
 
     ctx.blackboard.Set("path", path);
 
@@ -564,59 +401,9 @@ class PathToEnemyNode : public PathingNode {
   }
 };
 
-class FollowPathNode : public behavior::BehaviorNode {
- public:
-  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
-    auto path = ctx.blackboard.ValueOr("path", std::vector<Vector2f>());
-    size_t path_size = path.size();
-
-    if (path.empty()) return behavior::ExecuteResult::Failure;
-
-    auto& game = ctx.bot->GetGame();
-    Vector2f current = path.front();
-
-    while (path.size() > 1 &&
-           CanMoveBetween(game, game.GetPosition(), path.at(1))) {
-      path.erase(path.begin());
-      current = path.front();
-    }
-
-    if (path.size() == 1 &&
-        path.front().DistanceSq(game.GetPosition()) < 2 * 2) {
-      path.clear();
-    }
-
-    if (path.size() != path_size) {
-      ctx.blackboard.Set("path", path);
-    }
-
-    ctx.bot->Move(current, 0.0f);
-
-    return behavior::ExecuteResult::Success;
-  }
-
- private:
-  bool CanMoveBetween(GameProxy& game, Vector2f from, Vector2f to) {
-    Vector2f trajectory = to - from;
-    Vector2f direction = Normalize(trajectory);
-    Vector2f side = Perpendicular(direction);
-
-    float distance = from.Distance(to);
-    float radius = game.GetShipSettings().GetRadius();
-
-    CastResult center = RayCast(game.GetMap(), from, direction, distance);
-    CastResult side1 =
-        RayCast(game.GetMap(), from + side * radius, direction, distance);
-    CastResult side2 =
-        RayCast(game.GetMap(), from - side * radius, direction, distance);
-
-    return !center.hit && !side1.hit && !side2.hit;
-  }
-};
-
 Bot::Bot(std::unique_ptr<GameProxy> game)
     : game_(std::move(game)), steering_(this) {
-  auto processor = std::make_unique<path::NodeProcessor>(*game_);
+  auto processor = std::make_unique<path::NodeProcessor>(game_->GetMap());
 
   last_ship_change_ = 0;
   ship_ = game_->GetPlayer().ship;
@@ -645,7 +432,7 @@ Bot::Bot(std::unique_ptr<GameProxy> game)
   auto shoot_enemy = std::make_unique<ShootEnemyNode>();
   auto path_to_enemy = std::make_unique<PathToEnemyNode>();
   auto move_to_enemy = std::make_unique<MoveToEnemyNode>();
-  auto follow_path = std::make_unique<FollowPathNode>();
+  auto follow_path = std::make_unique<behavior::FollowPathNode>();
   auto patrol = std::make_unique<PatrolNode>();
   auto bundle_shots = std::make_unique<BundleShots>();
 
@@ -721,6 +508,7 @@ void Bot::Update(float dt) {
     return;
   }
 
+#if 0
   MapCoord spawn = game_->GetSettings().SpawnSettings[0].GetCoord();
   MapCoord current_coord((uint16_t)game_->GetPosition().x,
                          (uint16_t)game_->GetPosition().y);
@@ -729,16 +517,14 @@ void Bot::Update(float dt) {
     game_->Warp();
     return;
   }
+#endif
 
   steering_.Reset();
 
   behavior_ctx_.bot = this;
   behavior_ctx_.dt = dt;
-  behavior_ctx_.blackboard.Set("path", path_);
 
   behavior_->Update(behavior_ctx_);
-
-  path_ = behavior_ctx_.blackboard.ValueOr("path", path_);
 
   Steer();
 }

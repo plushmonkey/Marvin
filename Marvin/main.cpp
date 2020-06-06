@@ -11,6 +11,7 @@
 #include "path/Pathfinder.h"
 #include "platform/ContinuumGameProxy.h"
 #include "platform/ExeProcess.h"
+#include "hyperspace/Hyperspace.h"
 
 namespace marvin {
 std::ofstream debug_log;
@@ -100,6 +101,10 @@ marvin::Bot& CreateBot() {
   auto proxy = std::make_unique<marvin::ContinuumGameProxy>(g_hWnd);
 
   g_Bot = std::make_unique<marvin::Bot>(std::move(proxy));
+
+#if 0
+  marvin::hs::SetHyperspaceBehavior(*g_Bot);
+#endif
 
   return *g_Bot;
 }
