@@ -161,6 +161,19 @@ inline bool operator<(const Vector2f& lhs, const Vector2f& rhs) noexcept {
   return lhs.x < rhs.x;
 }
 
+inline float WrapMax(float x, float max) {
+  return fmod(max + fmod(x, max), max);
+}
+
+inline float WrapMinMax(float x, float min, float max) {
+  return min + WrapMax(x - min, max - min);
+}
+
+inline float WrapToPi(float rads) {
+  return WrapMinMax(rads, -3.14159f, 3.14159f);
+}
+
+
 }  // namespace marvin
 
 inline std::ostream& operator<<(std::ostream& out, const marvin::Vector2f& v) {

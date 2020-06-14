@@ -4,13 +4,15 @@
 #include <cstring>
 #include <limits>
 
+#include "Debug.h"
 #include "GameProxy.h"
 #include "Map.h"
 #include "RayCaster.h"
 #include "RegionRegistry.h"
+#include "behavior/nodes/FollowPathNode.h"
 #include "platform/Platform.h"
 
-namespace {
+namespace marvin {
 
 bool InRect(marvin::Vector2f pos, marvin::Vector2f min_rect,
             marvin::Vector2f max_rect) {
@@ -62,63 +64,6 @@ marvin::Vector2f CalculateShot(const marvin::Vector2f& pShooter,
   return solution;
 }
 
-}  // namespace
-
-namespace marvin {
-
-class PathingNode : public behavior::BehaviorNode {
- public:
-  using Path = std::vector<Vector2f>;
-
-  virtual behavior::ExecuteResult Execute(
-      behavior::ExecuteContext& ctx) override = 0;
-
- protected:
-  Path CreatePath(behavior::ExecuteContext& ctx, const std::string& pathname,
-                  Vector2f from, Vector2f to) {
-    bool build = true;
-    auto& game = ctx.bot->GetGame();
-
-    Path path = ctx.blackboard.ValueOr(pathname, Path());
-
-    if (!path.empty()) {
-      // Check if the current destination is the same as the requested one.
-      if (path.back().DistanceSq(to) < 3 * 3) {
-        Vector2f pos = game.GetPosition();
-        Vector2f next = path.front();
-        Vector2f direction = Normalize(next - pos);
-        Vector2f side = Perpendicular(direction);
-        float radius = game.GetShipSettings().GetRadius();
-
-        float distance = next.Distance(pos);
-
-        // Rebuild the path if the bot isn't in line of sight of its next node.
-        CastResult center = RayCast(game.GetMap(), pos, direction, distance);
-        CastResult side1 =
-            RayCast(game.GetMap(), pos + side * radius, direction, distance);
-        CastResult side2 =
-            RayCast(game.GetMap(), pos - side * radius, direction, distance);
-
-        if (!center.hit && !side1.hit && !side2.hit) {
-          build = false;
-        }
-      }
-    }
-
-    if (build) {
-      path = ctx.bot->GetPathfinder().FindPath(from, to);
-
-      int ship = game.GetPlayer().ship;
-      float ship_radius = game.GetSettings().ShipSettings[ship].GetRadius();
-
-      path =
-          ctx.bot->GetPathfinder().SmoothPath(path, game.GetMap(), ship_radius);
-    }
-
-    return path;
-  }
-};
-
 class PatrolNode : public PathingNode {
  public:
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
@@ -144,7 +89,8 @@ class PatrolNode : public PathingNode {
 
     Path path = ctx.blackboard.ValueOr("path", Path());
 
-    path = CreatePath(ctx, "path", from, to);
+    path =
+        CreatePath(ctx, "path", from, to, game.GetShipSettings().GetRadius());
 
     ctx.blackboard.Set("path", path);
 
@@ -176,115 +122,6 @@ class InLineOfSightNode : public behavior::BehaviorNode {
 
  private:
   VectorSelector selector_;
-};
-
-class FindEnemyNode : public behavior::BehaviorNode {
- public:
-  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
-    behavior::ExecuteResult result = behavior::ExecuteResult::Failure;
-    float closest_cost = std::numeric_limits<float>::max();
-    auto& game = ctx.bot->GetGame();
-    const Player* target = nullptr;
-    const Player& bot_player = ctx.bot->GetGame().GetPlayer();
-
-    Vector2f resolution(1920, 1080);
-    view_min_ = bot_player.position - resolution / 2.0f / 16.0f;
-    view_max_ = bot_player.position + resolution / 2.0f / 16.0f;
-
-    for (std::size_t i = 0; i < game.GetPlayers().size(); ++i) {
-      const marvin::Player& player = game.GetPlayers()[i];
-
-      if (!IsValidTarget(ctx, player)) continue;
-
-      float cost = CalculateCost(game, bot_player, player);
-
-      if (cost < closest_cost) {
-        closest_cost = cost;
-        target = &game.GetPlayers()[i];
-        result = behavior::ExecuteResult::Success;
-      }
-    }
-
-    const Player* current_target =
-        ctx.blackboard.ValueOr<const Player*>("target_player", nullptr);
-
-    if (current_target) {
-      // Calculate the cost to the current target so there's some stickiness
-      // between close targets.
-      const float kStickiness = 2.0f;
-      float cost = CalculateCost(game, bot_player, *current_target);
-
-      if (cost * kStickiness < closest_cost) {
-        target = current_target;
-      }
-    }
-
-    if (current_target != target) {
-      ctx.blackboard.Set("aggression", 0.0f);
-    }
-
-    ctx.blackboard.Set("target_player", target);
-    const Player* r =
-        ctx.blackboard.ValueOr<const Player*>("target_player", nullptr);
-
-    return result;
-  }
-
- private:
-  float CalculateCost(GameProxy& game, const Player& bot_player,
-                      const Player& target) {
-    float dist = bot_player.position.Distance(target.position);
-    // How many seconds it takes to rotate 180 degrees
-    float rotate_speed = game.GetShipSettings().MaximumRotation / 200.0f;
-    float move_cost =
-        dist / (game.GetShipSettings().MaximumSpeed / 10.0f / 16.0f);
-    Vector2f direction = Normalize(target.position - bot_player.position);
-    float dot = std::abs(bot_player.GetHeading().Dot(direction) - 1.0f) / 2.0f;
-    float rotate_cost = std::abs(dot) * rotate_speed;
-
-    return move_cost + rotate_cost;
-  }
-
-  bool IsValidTarget(behavior::ExecuteContext& ctx, const Player& target) {
-    const auto& game = ctx.bot->GetGame();
-    const Player& bot_player = game.GetPlayer();
-
-    if (target.id == game.GetPlayer().id) return false;
-    if (target.ship > 7) return false;
-    if (target.frequency == game.GetPlayer().frequency) return false;
-    if (target.name[0] == '<') return false;
-
-    if (game.GetMap().GetTileId(target.position) == marvin::kSafeTileId) {
-      return false;
-    }
-
-    if (!IsValidPosition(target.position)) {
-      return false;
-    }
-
-    MapCoord bot_coord(bot_player.position);
-    MapCoord target_coord(target.position);
-
-    if (!ctx.bot->GetRegions().IsConnected(bot_coord, target_coord)) {
-      return false;
-    }
-
-    bool stealthing = (target.status & 2) != 0;
-    bool cloaking = (target.status & 2) != 0;
-
-    if (!(game.GetPlayer().status & 4)) {
-      if (stealthing && cloaking) return false;
-
-      bool visible = InRect(target.position, view_min_, view_max_);
-
-      if (stealthing && !visible) return false;
-    }
-
-    return true;
-  }
-
-  Vector2f view_min_;
-  Vector2f view_max_;
 };
 
 class LookingAtEnemyNode : public behavior::BehaviorNode {
@@ -368,16 +205,20 @@ class BundleShots : public behavior::BehaviorNode {
     if (current_time < bundle_expire) return behavior::ExecuteResult::Failure;
 
     if (running_ && current_time >= start_time_ + duration) {
-      ctx.blackboard.Set("BundleCooldownExpire",
-                         current_time + cooldown + (rand() % 1000));
+      float energy_pct =
+          ctx.bot->GetGame().GetEnergy() /
+          (float)ctx.bot->GetGame().GetShipSettings().InitialEnergy;
+      uint64_t expiration = current_time + cooldown + (rand() % 1000);
+
+      expiration -= (uint64_t)((cooldown / 2ULL) * energy_pct);
+
+      ctx.blackboard.Set("BundleCooldownExpire", expiration);
       running_ = false;
       return behavior::ExecuteResult::Success;
     }
 
     auto& game = ctx.bot->GetGame();
 
-    Vector2f target_position =
-        ctx.blackboard.ValueOr("target_position", Vector2f());
     const Player& target =
         *ctx.blackboard.ValueOr<const Player*>("target_player", nullptr);
 
@@ -390,8 +231,8 @@ class BundleShots : public behavior::BehaviorNode {
       running_ = true;
     }
 
-    ctx.bot->Move(target_position, 0.0f);
-    ctx.bot->GetSteering().Face(target_position);
+    ctx.bot->Move(target.position, 0.0f);
+    ctx.bot->GetSteering().Face(target.position);
 
     ctx.bot->GetKeys().Press(VK_UP);
     ctx.bot->GetKeys().Press(VK_CONTROL);
@@ -435,16 +276,28 @@ class BundleShots : public behavior::BehaviorNode {
 class MoveToEnemyNode : public behavior::BehaviorNode {
  public:
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
-    const float hover_distance = 45.0f;
-    const float aggression_min = 15.0f;
+    const float hover_distance = 25.0f;
+    const float aggression_min = 10.0f;
 
     auto& game = ctx.bot->GetGame();
 
     float aggression = ctx.blackboard.ValueOr("aggression", 0.0f);
-    aggression += ctx.dt / 15.0f;
 
-    if (aggression > 1.0f) {
-      aggression = 1.0f;
+    float energy_pct =
+        game.GetEnergy() / (float)game.GetShipSettings().InitialEnergy;
+
+    if (energy_pct < 0.5f) {
+      aggression -= ctx.dt / 15.0f;
+
+      if (aggression < -0.5f) {
+        aggression = -0.5f;
+      }
+    } else {
+      aggression += ctx.dt / 15.0f;
+
+      if (aggression > 1.0f) {
+        aggression = 1.0f;
+      }
     }
 
     ctx.blackboard.Set("aggression", aggression);
@@ -489,13 +342,7 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
       }
     }
 
-    Vector2f heading = game.GetPlayer().GetHeading();
-
-    float dot = heading.Dot(Normalize(target_position - game.GetPosition()));
-
-    if (dot < 0.35f) {
-      ctx.bot->GetSteering().Face(target_position);
-    }
+    ctx.bot->GetSteering().Face(target_position);
 
     return behavior::ExecuteResult::Success;
   }
@@ -535,11 +382,13 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
         Vector2f hit = shooter.position + shoot_direction * distance;
 
         *dodge = Normalize(side * side.Dot(Normalize(hit - target.position)));
-#else
-        *dodge = Perpendicular(direction);
 #endif
 
-        return true;
+        if (distance < 40) {
+          *dodge = Perpendicular(direction);
+
+          return true;
+        }
       }
     }
 
@@ -556,7 +405,8 @@ class PathToEnemyNode : public PathingNode {
     auto to = ctx.blackboard.ValueOr<const Player*>("target_player", nullptr)
                   ->position;
 
-    Path path = CreatePath(ctx, "path", from, to);
+    Path path =
+        CreatePath(ctx, "path", from, to, game.GetShipSettings().GetRadius());
 
     ctx.blackboard.Set("path", path);
 
@@ -564,59 +414,19 @@ class PathToEnemyNode : public PathingNode {
   }
 };
 
-class FollowPathNode : public behavior::BehaviorNode {
- public:
+struct WarpNode : public behavior::BehaviorNode {
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
-    auto path = ctx.blackboard.ValueOr("path", std::vector<Vector2f>());
-    size_t path_size = path.size();
-
-    if (path.empty()) return behavior::ExecuteResult::Failure;
-
     auto& game = ctx.bot->GetGame();
-    Vector2f current = path.front();
 
-    while (path.size() > 1 &&
-           CanMoveBetween(game, game.GetPosition(), path.at(1))) {
-      path.erase(path.begin());
-      current = path.front();
-    }
-
-    if (path.size() == 1 &&
-        path.front().DistanceSq(game.GetPosition()) < 2 * 2) {
-      path.clear();
-    }
-
-    if (path.size() != path_size) {
-      ctx.blackboard.Set("path", path);
-    }
-
-    ctx.bot->Move(current, 0.0f);
+    game.Warp();
 
     return behavior::ExecuteResult::Success;
-  }
-
- private:
-  bool CanMoveBetween(GameProxy& game, Vector2f from, Vector2f to) {
-    Vector2f trajectory = to - from;
-    Vector2f direction = Normalize(trajectory);
-    Vector2f side = Perpendicular(direction);
-
-    float distance = from.Distance(to);
-    float radius = game.GetShipSettings().GetRadius();
-
-    CastResult center = RayCast(game.GetMap(), from, direction, distance);
-    CastResult side1 =
-        RayCast(game.GetMap(), from + side * radius, direction, distance);
-    CastResult side2 =
-        RayCast(game.GetMap(), from - side * radius, direction, distance);
-
-    return !center.hit && !side1.hit && !side2.hit;
   }
 };
 
 Bot::Bot(std::unique_ptr<GameProxy> game)
     : game_(std::move(game)), steering_(this) {
-  auto processor = std::make_unique<path::NodeProcessor>(*game_);
+  auto processor = std::make_unique<path::NodeProcessor>(game_->GetMap());
 
   last_ship_change_ = 0;
   ship_ = game_->GetPlayer().ship;
@@ -642,10 +452,19 @@ Bot::Bot(std::unique_ptr<GameProxy> game)
         return result;
       });
 
+  // Warp the player back to spawn when they leave the spawn area
+  MapCoord spawn = game_->GetSettings().SpawnSettings[0].GetCoord();
+  auto in_spawn_region = std::make_unique<InRegionNode>(spawn);
+  auto invert_in_region =
+      std::make_unique<behavior::InvertNode>(in_spawn_region.get());
+  auto warp_node = std::make_unique<WarpNode>();
+  auto warp_to_center = std::make_unique<behavior::SequenceNode>(
+      invert_in_region.get(), warp_node.get());
+
   auto shoot_enemy = std::make_unique<ShootEnemyNode>();
   auto path_to_enemy = std::make_unique<PathToEnemyNode>();
   auto move_to_enemy = std::make_unique<MoveToEnemyNode>();
-  auto follow_path = std::make_unique<FollowPathNode>();
+  auto follow_path = std::make_unique<behavior::FollowPathNode>();
   auto patrol = std::make_unique<PatrolNode>();
   auto bundle_shots = std::make_unique<BundleShots>();
 
@@ -672,7 +491,12 @@ Bot::Bot(std::unique_ptr<GameProxy> game)
       find_enemy.get(), path_or_shoot_selector.get());
 
   auto root_selector = std::make_unique<behavior::SelectorNode>(
-      handle_enemy.get(), patrol_path_sequence.get());
+      warp_to_center.get(), handle_enemy.get(), patrol_path_sequence.get());
+
+  behavior_nodes_.push_back(std::move(in_spawn_region));
+  behavior_nodes_.push_back(std::move(invert_in_region));
+  behavior_nodes_.push_back(std::move(warp_node));
+  behavior_nodes_.push_back(std::move(warp_to_center));
 
   behavior_nodes_.push_back(std::move(find_enemy));
   behavior_nodes_.push_back(std::move(looking_at_enemy));
@@ -721,65 +545,118 @@ void Bot::Update(float dt) {
     return;
   }
 
-  MapCoord spawn = game_->GetSettings().SpawnSettings[0].GetCoord();
-  MapCoord current_coord((uint16_t)game_->GetPosition().x,
-                         (uint16_t)game_->GetPosition().y);
-
-  if (!regions_->IsConnected(current_coord, spawn)) {
-    game_->Warp();
-    return;
-  }
-
   steering_.Reset();
 
   behavior_ctx_.bot = this;
   behavior_ctx_.dt = dt;
-  behavior_ctx_.blackboard.Set("path", path_);
 
   behavior_->Update(behavior_ctx_);
-
-  path_ = behavior_ctx_.blackboard.ValueOr("path", path_);
 
   Steer();
 }
 
 void Bot::Steer() {
+  Vector2f center = GetWindowCenter();
+  float debug_y = 100;
+
   Vector2f force = steering_.GetSteering();
   float rotation = steering_.GetRotation();
 
   Vector2f heading = game_->GetPlayer().GetHeading();
+  // Start out by trying to move in the direction that the bot is facing.
+  Vector2f steering_direction = heading;
 
-  if (rotation != 0.0f) {
-    float speed = game_->GetShipSettings().MaximumSpeed / 10.0f / 16.0f;
-    force += Rotate(heading, rotation) * speed * 0.2f;
+  bool has_force = force.LengthSq() > 0.0f;
+
+  // If the steering system calculated any movement force, then set the movement
+  // direction to it.
+  if (has_force) {
+    steering_direction = marvin::Normalize(force);
   }
 
-  if (force.LengthSq() > 0.0f) {
-    Vector2f direction = marvin::Normalize(force);
+  // Rotate toward the movement direction.
+  Vector2f rotate_target = steering_direction;
 
-    // Simple movement controller
-    auto perp = marvin::Perpendicular(heading);
-    float dot = heading.Dot(direction);
-    bool clockwise = perp.Dot(direction) >= 0.0;
-    bool target_behind = force.Dot(direction) < 0.0f;
+  // If the steering system calculated any rotation then rotate from the heading
+  // to desired orientation.
+  if (rotation != 0.0f) {
+    rotate_target = Rotate(heading, -rotation);
+  }
 
-    float threshold = 0.15f;
+  if (!has_force) {
+    steering_direction = rotate_target;
+  }
 
-    if (target_behind) {
-      clockwise = !clockwise;
-    }
+  Vector2f perp = marvin::Perpendicular(heading);
+  bool behind = force.Dot(heading) < 0;
+  // This is whether or not the steering direction is pointing to the left of
+  // the ship.
+  bool leftside = steering_direction.Dot(perp) < 0;
 
-    if (dot < -threshold) {
+  // Cap the steering direction so it's pointing toward the rotate target.
+  if (steering_direction.Dot(rotate_target) < 0.75) {
+    RenderText("adjusting", center - Vector2f(0, debug_y), RGB(100, 100, 100),
+               RenderText_Centered);
+    debug_y -= 20;
+    float rotation = 0.1f;
+    int sign = leftside ? 1 : -1;
+
+    // Pick the side of the rotate target that is closest to the force
+    // direction.
+    steering_direction = Rotate(rotate_target, rotation * sign);
+
+    leftside = steering_direction.Dot(perp) < 0;
+  }
+
+  bool clockwise = !leftside;
+
+  if (has_force) {
+    if (behind) {
       keys_.Press(VK_DOWN);
-    } else if (dot > threshold) {
+    } else {
       keys_.Press(VK_UP);
     }
-
-    if (dot < 1.0f) {
-      keys_.Set(VK_RIGHT, clockwise);
-      keys_.Set(VK_LEFT, !clockwise);
-    }
   }
+
+  if (heading.Dot(steering_direction) < 1.0f) {
+    keys_.Set(VK_RIGHT, clockwise);
+    keys_.Set(VK_LEFT, !clockwise);
+  }
+
+#ifdef DEBUG_RENDER
+
+  if (has_force) {
+    Vector2f force_direction = Normalize(force);
+    float force_percent =
+        force.Length() /
+        (GetGame().GetShipSettings().MaximumSpeed / 16.0f / 16.0f);
+    RenderLine(center, center + (force_direction * 100 * force_percent),
+               RGB(255, 255, 0));
+  }
+
+  RenderLine(center, center + (heading * 100), RGB(255, 0, 0));
+  RenderLine(center, center + (perp * 100), RGB(100, 0, 100));
+  RenderLine(center, center + (rotate_target * 85), RGB(0, 0, 255));
+  RenderLine(center, center + (steering_direction * 75), RGB(0, 255, 0));
+
+  if (behind) {
+    RenderText("behind", center - Vector2f(0, debug_y), RGB(100, 100, 100),
+               RenderText_Centered);
+    debug_y -= 20;
+  }
+
+  if (leftside) {
+    RenderText("leftside", center - Vector2f(0, debug_y), RGB(100, 100, 100),
+               RenderText_Centered);
+    debug_y -= 20;
+  }
+
+  if (rotation != 0.0f) {
+    RenderText("face-locked", center - Vector2f(0, debug_y), RGB(100, 100, 100),
+               RenderText_Centered);
+    debug_y -= 20;
+  }
+#endif
 }
 
 void Bot::Move(const Vector2f& target, float target_distance) {
@@ -791,8 +668,7 @@ void Bot::Move(const Vector2f& target, float target_distance) {
   } else {
     Vector2f to_target = target - bot_player.position;
 
-    steering_.Seek(target -
-                   Normalize(to_target) * (target_distance - distance));
+    steering_.Seek(target - Normalize(to_target) * target_distance);
   }
 }
 

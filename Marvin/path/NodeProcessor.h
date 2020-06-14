@@ -20,19 +20,18 @@ struct NodeConnections {
 // Determines the node edges when using A*.
 class NodeProcessor {
  public:
-  NodeProcessor(GameProxy& game) : game_(game), map_(game.GetMap()) {
+  NodeProcessor(const Map& map) : map_(map) {
     nodes_.resize(kMaxNodes);
   }
 
   void ResetNodes();
 
-  NodeConnections FindEdges(Node* node, Node* start, Node* goal);
+  NodeConnections FindEdges(Node* node, Node* start, Node* goal, float radius);
   Node* GetNode(NodePoint point);
 
  private:
   std::vector<Node> nodes_;
   const Map& map_;
-  GameProxy& game_;
 };
 
 }  // namespace path

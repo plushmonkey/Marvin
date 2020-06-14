@@ -21,6 +21,7 @@ class SteeringBehavior {
   void Arrive(Vector2f target, float deceleration);
   void Pursue(const Player& enemy);
   void Face(Vector2f target);
+  void AvoidWalls();
 
  private:
   Bot* bot_;

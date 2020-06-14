@@ -22,7 +22,7 @@ struct Player {
   uint16_t frequency;
   uint16_t discrete_rotation;
 
-  uint16_t energy;
+  int32_t energy;
   uint8_t status;
 
   Vector2f GetHeading() const {

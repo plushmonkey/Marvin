@@ -7,14 +7,12 @@
 #include <iostream>
 
 #include "Bot.h"
+#include "Debug.h"
 #include "Map.h"
+#include "hyperspace/Hyperspace.h"
 #include "path/Pathfinder.h"
 #include "platform/ContinuumGameProxy.h"
 #include "platform/ExeProcess.h"
-
-namespace marvin {
-std::ofstream debug_log;
-}
 
 const char* kEnabledText = "Continuum (enabled)";
 const char* kDisabledText = "Continuum (disabled)";
@@ -25,7 +23,7 @@ using seconds = std::chrono::duration<float>;
 
 std::unique_ptr<marvin::Bot> g_Bot;
 static bool g_Enabled = true;
-static HWND g_hWnd;
+HWND g_hWnd = 0;
 static time_point g_LastUpdateTime;
 
 static SHORT(WINAPI* RealGetAsyncKeyState)(int vKey) = GetAsyncKeyState;
@@ -34,7 +32,11 @@ static BOOL(WINAPI* RealPeekMessageA)(LPMSG lpMsg, HWND hWnd,
                                       UINT wRemoveMsg) = PeekMessageA;
 
 SHORT WINAPI OverrideGetAsyncKeyState(int vKey) {
+#if DEBUG_USER_CONTROL
+  if (1) {
+#else
   if (!g_Enabled) {
+#endif
     return RealGetAsyncKeyState(vKey);
   }
 
@@ -69,6 +71,10 @@ BOOL WINAPI OverridePeekMessageA(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin,
 
   g_LastUpdateTime = now;
 
+#if DEBUG_RENDER
+  marvin::WaitForSync();
+#endif
+
   return RealPeekMessageA(lpMsg, hWnd, wMsgFilterMin, wMsgFilterMax,
                           wRemoveMsg);
 }
@@ -101,6 +107,10 @@ marvin::Bot& CreateBot() {
 
   g_Bot = std::make_unique<marvin::Bot>(std::move(proxy));
 
+#if 0
+  marvin::hs::SetHyperspaceBehavior(*g_Bot);
+#endif
+
   return *g_Bot;
 }
 
@@ -110,10 +120,10 @@ extern "C" __declspec(dllexport) void InitializeMarvin() {
   marvin::debug_log.open("marvin.log", std::ios::out | std::ios::app);
 
   marvin::debug_log << "Starting Marvin.\n";
-  
+
   try {
     CreateBot();
-  } catch (std::exception & e) {
+  } catch (std::exception& e) {
     MessageBox(NULL, e.what(), "A", MB_OK);
   }
 
@@ -124,7 +134,7 @@ extern "C" __declspec(dllexport) void InitializeMarvin() {
   DetourAttach(&(PVOID&)RealGetAsyncKeyState, OverrideGetAsyncKeyState);
   DetourAttach(&(PVOID&)RealPeekMessageA, OverridePeekMessageA);
   DetourTransactionCommit();
-  
+
   SetWindowText(g_hWnd, kEnabledText);
 
   marvin::debug_log << "Marvin started successfully." << std::endl;

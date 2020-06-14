@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "../RayCaster.h"
+#include "../Bot.h"
 
 namespace marvin {
 namespace path {
@@ -29,20 +30,20 @@ Vector2f ClosestWall(const Map& map, Vector2f pos, int search) {
       }
     }
   }
-
+  
   return closest;
 }
 
 bool IsPassablePath(const Map& map, Vector2f from, Vector2f to, float radius) {
   const Vector2f direction = Normalize(to - from);
-  const Vector2f side = Perpendicular(direction) * (radius * 0.3f);
+  const Vector2f side = Perpendicular(direction) * radius;
   const float distance = from.Distance(to);
 
   CastResult cast_center = RayCast(map, from, direction, distance);
-  // CastResult cast_side1 = RayCast(level, from + side, direction, distance);
-  // CastResult cast_side2 = RayCast(level, from - side, direction, distance);
+  CastResult cast_side1 = RayCast(map, from + side, direction, distance);
+  CastResult cast_side2 = RayCast(map, from - side, direction, distance);
 
-  return !cast_center.hit;  //&& !cast_side1.hit && !cast_side2.hit;
+  return !cast_center.hit && !cast_side1.hit && !cast_side2.hit;
 }
 
 NodePoint ToNodePoint(const Vector2f v) {
@@ -65,7 +66,7 @@ Pathfinder::Pathfinder(std::unique_ptr<NodeProcessor> processor)
     : processor_(std::move(processor)) {}
 
 std::vector<Vector2f> Pathfinder::FindPath(const Vector2f& from,
-                                           const Vector2f& to) {
+                                           const Vector2f& to, float radius) {
   std::vector<Vector2f> path;
 
   processor_->ResetNodes();
@@ -89,7 +90,7 @@ std::vector<Vector2f> Pathfinder::FindPath(const Vector2f& from,
 
     node->closed = true;
 
-    NodeConnections connections = processor_->FindEdges(node, start, goal);
+    NodeConnections connections = processor_->FindEdges(node, start, goal, radius);
 
     for (std::size_t i = 0; i < connections.count; ++i) {
       Node* edge = connections.neighbors[i];
@@ -113,6 +114,10 @@ std::vector<Vector2f> Pathfinder::FindPath(const Vector2f& from,
         edge->openset = true;
       }
     }
+  }
+
+  if (goal->parent) {
+    path.push_back(Vector2f(start->point.x, start->point.y));
   }
 
   // Construct path backwards from goal node
@@ -140,11 +145,15 @@ std::vector<Vector2f> Pathfinder::SmoothPath(const std::vector<Vector2f>& path,
   std::vector<Vector2f> result;
 
   // How far away it should try to push the path from walls
-  float push_distance = 2.1f;
+  float push_distance = ship_radius * 1.5f;
 
   result.resize(path.size());
 
-  for (std::size_t i = 0; i < path.size(); ++i) {
+  if (!path.empty()) {
+    result[0] = path[0] + Vector2f(0.5, 0.5);
+  }
+
+  for (std::size_t i = 1; i < path.size(); ++i) {
     Vector2f current = path[i] + Vector2f(0.5, 0.5);
     Vector2f closest =
         ClosestWall(map, current, (int)std::ceil(push_distance + 1));
@@ -155,16 +164,16 @@ std::vector<Vector2f> Pathfinder::SmoothPath(const std::vector<Vector2f>& path,
       // TODO: iterative box penetration push
 
       Vector2f center = closest + Vector2f(0.5, 0.5);
-      CastResult cast_result = RayCast(map, current, center, push_distance + 1);
-      Vector2f hit = cast_result.hit ? cast_result.position : center;
+      Vector2f direction = Normalize(center - current);
+      CastResult cast_result = RayCast(map, current, direction, push_distance);
 
-      // double dist = BoxPointDistance(closest, Vec2(1, 1), current);
-      float dist = hit.Distance(current);
-      float force = push_distance - dist;
+      if (cast_result.hit) {
+        Vector2f hit = cast_result.position;
+        float dist = hit.Distance(current);
+        float force = push_distance - dist;
 
-      if (force < 0) force = 0;
-
-      new_pos = current + Normalize(current - hit) * force;
+        new_pos = current + Normalize(current - hit) * force;
+      }
     }
 
     if (current != new_pos) {
@@ -182,10 +191,7 @@ std::vector<Vector2f> Pathfinder::SmoothPath(const std::vector<Vector2f>& path,
   std::vector<Vector2f> minimum;
   minimum.reserve(result.size());
 
-  minimum.push_back(result[0]);
-
-  Vector2f prev = minimum[0];
-
+  Vector2f prev = result[0];
   for (std::size_t i = 1; i < result.size(); ++i) {
     Vector2f curr = result[i];
     Vector2f direction = Normalize(curr - prev);
@@ -202,7 +208,7 @@ std::vector<Vector2f> Pathfinder::SmoothPath(const std::vector<Vector2f>& path,
         break;
       }
 
-      if (result[i - 1] != minimum.back()) {
+      if (!minimum.empty() && result[i - 1] != minimum.back()) {
         minimum.push_back(result[i - 1]);
         prev = minimum.back();
         i--;
