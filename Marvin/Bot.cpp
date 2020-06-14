@@ -219,8 +219,6 @@ class BundleShots : public behavior::BehaviorNode {
 
     auto& game = ctx.bot->GetGame();
 
-    Vector2f target_position =
-        ctx.blackboard.ValueOr("target_position", Vector2f());
     const Player& target =
         *ctx.blackboard.ValueOr<const Player*>("target_player", nullptr);
 
@@ -233,8 +231,8 @@ class BundleShots : public behavior::BehaviorNode {
       running_ = true;
     }
 
-    ctx.bot->Move(target_position, 0.0f);
-    ctx.bot->GetSteering().Face(target_position);
+    ctx.bot->Move(target.position, 0.0f);
+    ctx.bot->GetSteering().Face(target.position);
 
     ctx.bot->GetKeys().Press(VK_UP);
     ctx.bot->GetKeys().Press(VK_CONTROL);
@@ -278,16 +276,28 @@ class BundleShots : public behavior::BehaviorNode {
 class MoveToEnemyNode : public behavior::BehaviorNode {
  public:
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
-    const float hover_distance = 45.0f;
-    const float aggression_min = 15.0f;
+    const float hover_distance = 25.0f;
+    const float aggression_min = 10.0f;
 
     auto& game = ctx.bot->GetGame();
 
     float aggression = ctx.blackboard.ValueOr("aggression", 0.0f);
-    aggression += ctx.dt / 15.0f;
 
-    if (aggression > 1.0f) {
-      aggression = 1.0f;
+    float energy_pct =
+        game.GetEnergy() / (float)game.GetShipSettings().InitialEnergy;
+
+    if (energy_pct < 0.5f) {
+      aggression -= ctx.dt / 15.0f;
+
+      if (aggression < -0.5f) {
+        aggression = -0.5f;
+      }
+    } else {
+      aggression += ctx.dt / 15.0f;
+
+      if (aggression > 1.0f) {
+        aggression = 1.0f;
+      }
     }
 
     ctx.blackboard.Set("aggression", aggression);
@@ -374,7 +384,7 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
         *dodge = Normalize(side * side.Dot(Normalize(hit - target.position)));
 #endif
 
-        if (distance < 25) {
+        if (distance < 40) {
           *dodge = Perpendicular(direction);
 
           return true;
@@ -546,6 +556,9 @@ void Bot::Update(float dt) {
 }
 
 void Bot::Steer() {
+  Vector2f center = GetWindowCenter();
+  float debug_y = 100;
+
   Vector2f force = steering_.GetSteering();
   float rotation = steering_.GetRotation();
 
@@ -570,14 +583,23 @@ void Bot::Steer() {
     rotate_target = Rotate(heading, -rotation);
   }
 
+  if (!has_force) {
+    steering_direction = rotate_target;
+  }
+
   Vector2f perp = marvin::Perpendicular(heading);
   bool behind = force.Dot(heading) < 0;
+  // This is whether or not the steering direction is pointing to the left of
+  // the ship.
   bool leftside = steering_direction.Dot(perp) < 0;
 
   // Cap the steering direction so it's pointing toward the rotate target.
   if (steering_direction.Dot(rotate_target) < 0.75) {
+    RenderText("adjusting", center - Vector2f(0, debug_y), RGB(100, 100, 100),
+               RenderText_Centered);
+    debug_y -= 20;
     float rotation = 0.1f;
-    int sign = leftside ? -1 : 1;
+    int sign = leftside ? 1 : -1;
 
     // Pick the side of the rotate target that is closest to the force
     // direction.
@@ -602,12 +624,6 @@ void Bot::Steer() {
   }
 
 #ifdef DEBUG_RENDER
-  Vector2f center = GetWindowCenter();
-
-  RenderLine(center, center + (heading * 100), RGB(255, 0, 0));
-  RenderLine(center, center + (steering_direction * 100), RGB(0, 255, 0));
-  RenderLine(center, center + (rotate_target * 100), RGB(0, 0, 255));
-  RenderLine(center, center + (perp * 100), RGB(100, 0, 100));
 
   if (has_force) {
     Vector2f force_direction = Normalize(force);
@@ -618,19 +634,27 @@ void Bot::Steer() {
                RGB(255, 255, 0));
   }
 
+  RenderLine(center, center + (heading * 100), RGB(255, 0, 0));
+  RenderLine(center, center + (perp * 100), RGB(100, 0, 100));
+  RenderLine(center, center + (rotate_target * 85), RGB(0, 0, 255));
+  RenderLine(center, center + (steering_direction * 75), RGB(0, 255, 0));
+
   if (behind) {
-    RenderText("behind", center - Vector2f(0, 100), RGB(100, 100, 100),
+    RenderText("behind", center - Vector2f(0, debug_y), RGB(100, 100, 100),
                RenderText_Centered);
+    debug_y -= 20;
   }
 
   if (leftside) {
-    RenderText("leftside", center - Vector2f(0, 80), RGB(100, 100, 100),
+    RenderText("leftside", center - Vector2f(0, debug_y), RGB(100, 100, 100),
                RenderText_Centered);
+    debug_y -= 20;
   }
 
   if (rotation != 0.0f) {
-    RenderText("face-locked", center - Vector2f(0, 60), RGB(100, 100, 100),
+    RenderText("face-locked", center - Vector2f(0, debug_y), RGB(100, 100, 100),
                RenderText_Centered);
+    debug_y -= 20;
   }
 #endif
 }
@@ -644,8 +668,7 @@ void Bot::Move(const Vector2f& target, float target_distance) {
   } else {
     Vector2f to_target = target - bot_player.position;
 
-    steering_.Seek(target -
-                   Normalize(to_target) * (target_distance - distance));
+    steering_.Seek(target - Normalize(to_target) * target_distance);
   }
 }
 
