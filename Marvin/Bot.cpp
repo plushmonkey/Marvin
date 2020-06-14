@@ -171,7 +171,11 @@ class LookingAtEnemyNode : public behavior::BehaviorNode {
                             box_min, box_extent, &dist, &norm);
     }
 
-    ctx.blackboard.Set("target_position", seek_position);
+    if (seek_position.DistanceSq(target_player->position) < 15 * 15) {
+      ctx.blackboard.Set("target_position", seek_position);
+    } else {
+      ctx.blackboard.Set("target_position", target.position);
+    }
 
     if (hit) {
       if (CanShoot(game.GetMap(), bot_player, target)) {
@@ -230,6 +234,8 @@ class BundleShots : public behavior::BehaviorNode {
       start_time_ = current_time;
       running_ = true;
     }
+
+    RenderText("BundleShots", GetWindowCenter() + Vector2f(0, 100), RGB(100, 100, 100), RenderText_Centered);
 
     ctx.bot->Move(target.position, 0.0f);
     ctx.bot->GetSteering().Face(target.position);
@@ -301,6 +307,7 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
     }
 
     ctx.blackboard.Set("aggression", aggression);
+
     Vector2f target_position =
         ctx.blackboard.ValueOr("target_position", Vector2f());
 
@@ -336,7 +343,7 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
         dodge_dist_sq) {
       Vector2f dodge;
 
-      if (IsAimingAt(game, shooter, game.GetPlayer(), &dodge)) {
+      if (energy_pct < 0.75 && IsAimingAt(game, shooter, game.GetPlayer(), &dodge)) {
         ctx.bot->GetSteering().Seek(game.GetPosition() + dodge, 100.0f);
         return behavior::ExecuteResult::Success;
       }
@@ -384,7 +391,7 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
         *dodge = Normalize(side * side.Dot(Normalize(hit - target.position)));
 #endif
 
-        if (distance < 40) {
+        if (distance < 30) {
           *dodge = Perpendicular(direction);
 
           return true;
@@ -601,6 +608,8 @@ void Bot::Steer() {
     float rotation = 0.1f;
     int sign = leftside ? 1 : -1;
 
+    if (behind) sign *= -1;
+
     // Pick the side of the rotate target that is closest to the force
     // direction.
     steering_direction = Rotate(rotate_target, rotation * sign);
@@ -638,6 +647,17 @@ void Bot::Steer() {
   RenderLine(center, center + (perp * 100), RGB(100, 0, 100));
   RenderLine(center, center + (rotate_target * 85), RGB(0, 0, 255));
   RenderLine(center, center + (steering_direction * 75), RGB(0, 255, 0));
+
+  if (rotation == 0.0f) {
+    RenderText("no rotation", center - Vector2f(0, debug_y), RGB(100, 100, 100),
+      RenderText_Centered);
+    debug_y -= 20;
+  } else {
+    std::string text = "rotation: " + std::to_string(rotation);
+    RenderText(text.c_str(), center - Vector2f(0, debug_y), RGB(100, 100, 100),
+      RenderText_Centered);
+    debug_y -= 20;
+  }
 
   if (behind) {
     RenderText("behind", center - Vector2f(0, debug_y), RGB(100, 100, 100),
