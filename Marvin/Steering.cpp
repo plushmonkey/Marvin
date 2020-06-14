@@ -85,11 +85,16 @@ void SteeringBehavior::Pursue(const Player& enemy) {
 
 void SteeringBehavior::Face(Vector2f target) {
   Vector2f to_target = target - bot_->GetGame().GetPosition();
-  Vector2f heading = bot_->GetGame().GetPlayer().GetHeading();
+  Vector2f heading = Rotate(bot_->GetGame().GetPlayer().GetHeading(), rotation_);
 
-  float dot = heading.Dot(Normalize(to_target));
+  float rotation = std::atan2(heading.y, heading.x) - std::atan2(to_target.y, to_target.x);
 
-  rotation_ += std::acos(dot);
+  rotation_ += WrapToPi(rotation);
+}
+
+void SteeringBehavior::AvoidWalls() {
+  auto& game = bot_->GetGame();
+  
 }
 
 }  // namespace marvin

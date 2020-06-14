@@ -4,6 +4,7 @@
 #include <cstring>
 #include <limits>
 
+#include "Debug.h"
 #include "GameProxy.h"
 #include "Map.h"
 #include "RayCaster.h"
@@ -204,8 +205,14 @@ class BundleShots : public behavior::BehaviorNode {
     if (current_time < bundle_expire) return behavior::ExecuteResult::Failure;
 
     if (running_ && current_time >= start_time_ + duration) {
-      ctx.blackboard.Set("BundleCooldownExpire",
-                         current_time + cooldown + (rand() % 1000));
+      float energy_pct =
+          ctx.bot->GetGame().GetEnergy() /
+          (float)ctx.bot->GetGame().GetShipSettings().InitialEnergy;
+      uint64_t expiration = current_time + cooldown + (rand() % 1000);
+
+      expiration -= (uint64_t)((cooldown / 2ULL) * energy_pct);
+
+      ctx.blackboard.Set("BundleCooldownExpire", expiration);
       running_ = false;
       return behavior::ExecuteResult::Success;
     }
@@ -325,13 +332,7 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
       }
     }
 
-    Vector2f heading = game.GetPlayer().GetHeading();
-
-    float dot = heading.Dot(Normalize(target_position - game.GetPosition()));
-
-    if (dot < 0.35f) {
-      ctx.bot->GetSteering().Face(target_position);
-    }
+    ctx.bot->GetSteering().Face(target_position);
 
     return behavior::ExecuteResult::Success;
   }
@@ -371,11 +372,13 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
         Vector2f hit = shooter.position + shoot_direction * distance;
 
         *dodge = Normalize(side * side.Dot(Normalize(hit - target.position)));
-#else
-        *dodge = Perpendicular(direction);
 #endif
 
-        return true;
+        if (distance < 25) {
+          *dodge = Perpendicular(direction);
+
+          return true;
+        }
       }
     }
 
@@ -534,38 +537,74 @@ void Bot::Steer() {
   float rotation = steering_.GetRotation();
 
   Vector2f heading = game_->GetPlayer().GetHeading();
+  // Start out by trying to move in the direction that the bot is facing.
+  Vector2f steering_direction = heading;
 
-  if (rotation != 0.0f) {
-    float speed = game_->GetShipSettings().MaximumSpeed / 10.0f / 16.0f;
-    force += Rotate(heading, rotation) * speed * 0.2f;
+  bool has_force = force.LengthSq() > 0.0f;
+
+  // If the steering system calculated any movement force, then set the movement
+  // direction to it.
+  if (has_force) {
+    steering_direction = marvin::Normalize(force);
   }
 
-  if (force.LengthSq() > 0.0f) {
-    Vector2f direction = marvin::Normalize(force);
+  // Rotate toward the movement direction.
+  Vector2f rotate_target = steering_direction;
 
-    // Simple movement controller
-    auto perp = marvin::Perpendicular(heading);
-    float dot = heading.Dot(direction);
-    bool clockwise = perp.Dot(direction) >= 0.0;
-    bool target_behind = force.Dot(direction) < 0.0f;
+  // If the steering system calculated any rotation then rotate from the heading
+  // to desired orientation.
+  if (rotation != 0.0f) {
+    rotate_target = Rotate(heading, -rotation);
+  }
 
-    float threshold = 0.15f;
+  Vector2f perp = marvin::Perpendicular(heading);
+  bool behind = force.Dot(heading) < 0;
+  bool leftside = steering_direction.Dot(perp) < 0;
 
-    if (target_behind) {
-      clockwise = !clockwise;
-    }
+  // Cap the steering direction so it's pointing toward the rotate target.
+  if (steering_direction.Dot(rotate_target) < 0.75) {
+    float rotation = 0.1f;
+    int sign = leftside ? -1 : 1;
 
-    if (dot < -threshold) {
+    // Pick the side of the rotate target that is closest to the force direction.
+    steering_direction = Rotate(rotate_target, rotation * sign);
+
+    leftside = steering_direction.Dot(perp) < 0;
+  }
+
+  bool clockwise = !leftside;
+
+  if (has_force) {
+    if (behind) {
       keys_.Press(VK_DOWN);
-    } else if (dot > threshold) {
+    } else {
       keys_.Press(VK_UP);
     }
-
-    if (dot < 1.0f) {
-      keys_.Set(VK_RIGHT, clockwise);
-      keys_.Set(VK_LEFT, !clockwise);
-    }
   }
+
+  if (heading.Dot(steering_direction) < 1.0f) {
+    keys_.Set(VK_RIGHT, clockwise);
+    keys_.Set(VK_LEFT, !clockwise);
+  }
+
+#ifdef DEBUG_RENDER
+  Vector2f center = GetWindowCenter();
+  RenderLine(center, center + (heading * 100), RGB(255, 0, 0));
+
+  RenderLine(center, center + (steering_direction * 100), RGB(0, 255, 0));
+
+  RenderLine(center, center + (rotate_target * 100), RGB(0, 0, 255));
+
+  RenderLine(center, center + (perp * 100), RGB(100, 0, 100));
+
+  if (behind) {
+    RenderText("behind", Vector2f(400, 200), RGB(100, 100, 100));
+  }
+
+  if (leftside) {
+    RenderText("leftside", Vector2f(400, 240), RGB(100, 100, 100));
+  }
+#endif
 }
 
 void Bot::Move(const Vector2f& target, float target_distance) {

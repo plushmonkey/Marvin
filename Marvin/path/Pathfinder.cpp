@@ -116,6 +116,10 @@ std::vector<Vector2f> Pathfinder::FindPath(const Vector2f& from,
     }
   }
 
+  if (goal->parent) {
+    path.push_back(Vector2f(start->point.x, start->point.y));
+  }
+
   // Construct path backwards from goal node
   std::vector<NodePoint> points;
   Node* current = goal;
@@ -145,7 +149,11 @@ std::vector<Vector2f> Pathfinder::SmoothPath(const std::vector<Vector2f>& path,
 
   result.resize(path.size());
 
-  for (std::size_t i = 0; i < path.size(); ++i) {
+  if (!path.empty()) {
+    result[0] = path[0] + Vector2f(0.5, 0.5);
+  }
+
+  for (std::size_t i = 1; i < path.size(); ++i) {
     Vector2f current = path[i] + Vector2f(0.5, 0.5);
     Vector2f closest =
         ClosestWall(map, current, (int)std::ceil(push_distance + 1));

@@ -73,6 +73,7 @@
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>..\lib\detours\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
     <LibraryPath>..\lib\detours\lib.X86;$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86</LibraryPath>
+    <OutDir>$(SolutionDir)bin\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
@@ -151,6 +152,7 @@
     <ClCompile Include="behavior\BehaviorTree.cpp" />
     <ClCompile Include="behavior\nodes\FollowPathNode.cpp" />
     <ClCompile Include="Bot.cpp" />
+    <ClCompile Include="Debug.cpp" />
     <ClCompile Include="hyperspace\Hyperspace.cpp" />
     <ClCompile Include="KeyController.cpp" />
     <ClCompile Include="Map.cpp" />
@@ -170,6 +172,7 @@
     <ClInclude Include="behavior\nodes\FollowPathNode.h" />
     <ClInclude Include="Bot.h" />
     <ClInclude Include="ClientSettings.h" />
+    <ClInclude Include="Debug.h" />
     <ClInclude Include="Hash.h" />
     <ClInclude Include="hyperspace\Hyperspace.h" />
     <ClInclude Include="KeyController.h" />

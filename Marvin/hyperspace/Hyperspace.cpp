@@ -1,6 +1,7 @@
 #include "Hyperspace.h"
 
 #include "../behavior/nodes/FollowPathNode.h"
+#include "../platform/Platform.h"
 
 namespace marvin {
 namespace hs {
@@ -127,6 +128,22 @@ struct BaseDefenseBehavior : public PathingNode {
       }
     } else {
       current_index_ = 0;
+    }
+
+    if (current_index_ > 0 && target) {
+      float energy_percent = (game.GetPlayer().energy /
+                              (float)game.GetShipSettings().InitialEnergy);
+
+      Vector2f node_position = base_path_[current_index_ - 1];
+      ctx.bot->GetSteering().Face(node_position);
+
+      if (energy_percent > 0.7) {
+        Vector2f to_target = target->position - game.GetPosition();
+        // if (to_target.Dot(game.GetPlayer().GetHeading()) >= 0.7f) {
+        if (node_position.Dot(game.GetPlayer().GetHeading()) >= 0.7f) {
+          ctx.bot->GetKeys().Press(VK_CONTROL);
+        }
+      }
     }
 
     // Construct a micro-level path to the current node from the larger base
