@@ -36,7 +36,7 @@ void SteeringBehavior::Reset() {
 
 void SteeringBehavior::Seek(Vector2f target, float multiplier) {
   float speed = GetMaxSpeed(*bot_);
-  
+
   Vector2f desired =
       Normalize(target - bot_->GetGame().GetPosition()) * speed * multiplier;
 
@@ -85,16 +85,15 @@ void SteeringBehavior::Pursue(const Player& enemy) {
 
 void SteeringBehavior::Face(Vector2f target) {
   Vector2f to_target = target - bot_->GetGame().GetPosition();
-  Vector2f heading = Rotate(bot_->GetGame().GetPlayer().GetHeading(), rotation_);
+  Vector2f heading =
+      Rotate(bot_->GetGame().GetPlayer().GetHeading(), rotation_);
 
-  float rotation = std::atan2(heading.y, heading.x) - std::atan2(to_target.y, to_target.x);
+  float rotation =
+      std::atan2(heading.y, heading.x) - std::atan2(to_target.y, to_target.x);
 
   rotation_ += WrapToPi(rotation);
 }
 
-void SteeringBehavior::AvoidWalls() {
-  auto& game = bot_->GetGame();
-  
-}
+void SteeringBehavior::AvoidWalls() { auto& game = bot_->GetGame(); }
 
 }  // namespace marvin

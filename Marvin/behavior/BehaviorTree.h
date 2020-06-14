@@ -80,5 +80,14 @@ protected:
   BehaviorNode* child_;
 };
 
+class InvertNode : public BehaviorNode {
+public:
+  InvertNode(BehaviorNode* child);
+
+  ExecuteResult Execute(ExecuteContext& ctx) override;
+protected:
+  BehaviorNode* child_;
+};
+
 }  // namespace behavior
 }  // namespace marvin

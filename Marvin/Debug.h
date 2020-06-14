@@ -14,8 +14,12 @@ namespace marvin {
 
 extern std::ofstream debug_log;
 
+enum RenderTextFlags {
+  RenderText_Centered = (1 << 1),
+};
+
 void RenderLine(Vector2f from, Vector2f to, COLORREF color);
-void RenderText(const char* text, Vector2f at, COLORREF color);
+void RenderText(const char* text, Vector2f at, COLORREF color, int flags = 0);
 void WaitForSync();
 
 Vector2f GetWindowCenter();

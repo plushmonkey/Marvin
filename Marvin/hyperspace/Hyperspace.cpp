@@ -33,21 +33,6 @@ float GetPathDistance(std::vector<Vector2f> path) {
   return distance;
 }
 
-struct InRegionNode : public behavior::BehaviorNode {
-  InRegionNode(Vector2f position) : target_(position) {}
-
-  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
-    marvin::MapCoord coord(ctx.bot->GetGame().GetPosition());
-
-    bool connected = ctx.bot->GetRegions().IsConnected(coord, target_);
-
-    return connected ? behavior::ExecuteResult::Success
-                     : behavior::ExecuteResult::Failure;
-  }
-
-  marvin::MapCoord target_;
-};
-
 struct MoveToNode : public PathingNode {
   MoveToNode(Vector2f target) : target_(target), follow_node_("nav_path") {}
 
@@ -130,11 +115,13 @@ struct BaseDefenseBehavior : public PathingNode {
       current_index_ = 0;
     }
 
+#if 0 // This is a test for gunning
     if (current_index_ > 0 && target) {
       float energy_percent = (game.GetPlayer().energy /
                               (float)game.GetShipSettings().InitialEnergy);
 
       Vector2f node_position = base_path_[current_index_ - 1];
+
       ctx.bot->GetSteering().Face(node_position);
 
       if (energy_percent > 0.7) {
@@ -145,6 +132,7 @@ struct BaseDefenseBehavior : public PathingNode {
         }
       }
     }
+#endif
 
     // Construct a micro-level path to the current node from the larger base
     // nodes.

@@ -404,6 +404,16 @@ class PathToEnemyNode : public PathingNode {
   }
 };
 
+struct WarpNode : public behavior::BehaviorNode {
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
+    auto& game = ctx.bot->GetGame();
+
+    game.Warp();
+
+    return behavior::ExecuteResult::Success;
+  }
+};
+
 Bot::Bot(std::unique_ptr<GameProxy> game)
     : game_(std::move(game)), steering_(this) {
   auto processor = std::make_unique<path::NodeProcessor>(game_->GetMap());
@@ -431,6 +441,15 @@ Bot::Bot(std::unique_ptr<GameProxy> game)
         }
         return result;
       });
+
+  // Warp the player back to spawn when they leave the spawn area
+  MapCoord spawn = game_->GetSettings().SpawnSettings[0].GetCoord();
+  auto in_spawn_region = std::make_unique<InRegionNode>(spawn);
+  auto invert_in_region =
+      std::make_unique<behavior::InvertNode>(in_spawn_region.get());
+  auto warp_node = std::make_unique<WarpNode>();
+  auto warp_to_center = std::make_unique<behavior::SequenceNode>(
+      invert_in_region.get(), warp_node.get());
 
   auto shoot_enemy = std::make_unique<ShootEnemyNode>();
   auto path_to_enemy = std::make_unique<PathToEnemyNode>();
@@ -462,7 +481,12 @@ Bot::Bot(std::unique_ptr<GameProxy> game)
       find_enemy.get(), path_or_shoot_selector.get());
 
   auto root_selector = std::make_unique<behavior::SelectorNode>(
-      handle_enemy.get(), patrol_path_sequence.get());
+      warp_to_center.get(), handle_enemy.get(), patrol_path_sequence.get());
+
+  behavior_nodes_.push_back(std::move(in_spawn_region));
+  behavior_nodes_.push_back(std::move(invert_in_region));
+  behavior_nodes_.push_back(std::move(warp_node));
+  behavior_nodes_.push_back(std::move(warp_to_center));
 
   behavior_nodes_.push_back(std::move(find_enemy));
   behavior_nodes_.push_back(std::move(looking_at_enemy));
@@ -511,17 +535,6 @@ void Bot::Update(float dt) {
     return;
   }
 
-#if 0
-  MapCoord spawn = game_->GetSettings().SpawnSettings[0].GetCoord();
-  MapCoord current_coord((uint16_t)game_->GetPosition().x,
-                         (uint16_t)game_->GetPosition().y);
-
-  if (!regions_->IsConnected(current_coord, spawn)) {
-    game_->Warp();
-    return;
-  }
-#endif
-
   steering_.Reset();
 
   behavior_ctx_.bot = this;
@@ -566,7 +579,8 @@ void Bot::Steer() {
     float rotation = 0.1f;
     int sign = leftside ? -1 : 1;
 
-    // Pick the side of the rotate target that is closest to the force direction.
+    // Pick the side of the rotate target that is closest to the force
+    // direction.
     steering_direction = Rotate(rotate_target, rotation * sign);
 
     leftside = steering_direction.Dot(perp) < 0;
@@ -589,20 +603,34 @@ void Bot::Steer() {
 
 #ifdef DEBUG_RENDER
   Vector2f center = GetWindowCenter();
+
   RenderLine(center, center + (heading * 100), RGB(255, 0, 0));
-
   RenderLine(center, center + (steering_direction * 100), RGB(0, 255, 0));
-
   RenderLine(center, center + (rotate_target * 100), RGB(0, 0, 255));
-
   RenderLine(center, center + (perp * 100), RGB(100, 0, 100));
 
+  if (has_force) {
+    Vector2f force_direction = Normalize(force);
+    float force_percent =
+        force.Length() /
+        (GetGame().GetShipSettings().MaximumSpeed / 16.0f / 16.0f);
+    RenderLine(center, center + (force_direction * 100 * force_percent),
+               RGB(255, 255, 0));
+  }
+
   if (behind) {
-    RenderText("behind", Vector2f(400, 200), RGB(100, 100, 100));
+    RenderText("behind", center - Vector2f(0, 100), RGB(100, 100, 100),
+               RenderText_Centered);
   }
 
   if (leftside) {
-    RenderText("leftside", Vector2f(400, 240), RGB(100, 100, 100));
+    RenderText("leftside", center - Vector2f(0, 80), RGB(100, 100, 100),
+               RenderText_Centered);
+  }
+
+  if (rotation != 0.0f) {
+    RenderText("face-locked", center - Vector2f(0, 60), RGB(100, 100, 100),
+               RenderText_Centered);
   }
 #endif
 }

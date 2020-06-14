@@ -232,4 +232,35 @@ class FindEnemyNode : public behavior::BehaviorNode {
   Vector2f view_max_;
 };
 
+struct InRegionNode : public behavior::BehaviorNode {
+  InRegionNode(Vector2f position) : target_(position) {}
+  InRegionNode(MapCoord position) : target_(position) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
+    marvin::MapCoord coord(ctx.bot->GetGame().GetPosition());
+
+    bool connected = ctx.bot->GetRegions().IsConnected(coord, target_);
+
+    return connected ? behavior::ExecuteResult::Success
+      : behavior::ExecuteResult::Failure;
+  }
+
+  marvin::MapCoord target_;
+};
+
+struct OnFrequencyNode : public behavior::BehaviorNode {
+  OnFrequencyNode(int frequency) : frequency(frequency) {}
+
+  behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
+    if (ctx.bot->GetGame().GetPlayer().frequency == frequency) {
+      return behavior::ExecuteResult::Success;
+    }
+
+    return behavior::ExecuteResult::Failure;
+  }
+
+  int frequency;
+};
+
+
 }  // namespace marvin

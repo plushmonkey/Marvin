@@ -144,7 +144,7 @@ std::string ContinuumGameProxy::GetName() const {
   return name;
 }
 
-int ContinuumGameProxy::GetEnergy() const { return 0; }
+int ContinuumGameProxy::GetEnergy() const { return player_->energy; }
 
 Vector2f ContinuumGameProxy::GetPosition() const {
   float x = (*position_data_) / 16.0f;
@@ -184,7 +184,10 @@ bool ContinuumGameProxy::SetShip(int ship) {
 
 void ContinuumGameProxy::Warp() { SendKey(VK_INSERT); }
 
-void ContinuumGameProxy::Cloak(KeyController& keys) { keys.Press(VK_SHIFT); SendKey(VK_HOME); }
+void ContinuumGameProxy::Cloak(KeyController& keys) {
+  keys.Press(VK_SHIFT);
+  SendKey(VK_HOME);
+}
 
 void ContinuumGameProxy::SetWindowFocus() {
   std::size_t focus_addr = game_addr_ + 0x3039c;
