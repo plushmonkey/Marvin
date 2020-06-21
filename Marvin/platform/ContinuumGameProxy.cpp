@@ -203,7 +203,7 @@ void ContinuumGameProxy::SendKey(int vKey) {
 }
 
 void ContinuumGameProxy::SendChatMessage(const std::string& mesg) const {
-  typedef void(__fastcall* ChatSendFunction)(void* This, void* thiscall_garbage, char* msg, u32 length, u32* rv);
+  typedef void(__fastcall* ChatSendFunction)(void* This, void* thiscall_garbage, char* msg, u32* unknown1, u32* unknown2);
 
   if (mesg.empty()) return;
 
@@ -215,11 +215,12 @@ void ContinuumGameProxy::SendChatMessage(const std::string& mesg) const {
   input[mesg.length()] = 0;
 
   ChatSendFunction send_func = (ChatSendFunction)(*(u32*)(module_base_continuum_ + 0xAC30C));
-  u32 rv = 0;
-
   void* This = (void*)(game_addr_ + 0x2DBF0);
 
-  send_func(This, nullptr, input, mesg.length(), &rv);
+  // Some value that the client passes in for some reason
+  u32 value = 0x4AC370;
+
+  send_func(This, nullptr, input, &value, 0);
 
   // Clear the text buffer after sending the message
   input[0] = 0;
