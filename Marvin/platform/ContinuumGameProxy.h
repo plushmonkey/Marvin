@@ -29,6 +29,8 @@ class ContinuumGameProxy : public GameProxy {
   void Warp() override;
   void Cloak(KeyController& keys) override;
 
+  void SendChatMessage(const std::string& mesg) const override;
+
   void SetWindowFocus();
 
   ExeProcess& GetProcess();

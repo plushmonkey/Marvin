@@ -202,4 +202,27 @@ void ContinuumGameProxy::SendKey(int vKey) {
   SendMessage(hwnd_, WM_KEYUP, (WPARAM)vKey, 0);
 }
 
+void ContinuumGameProxy::SendChatMessage(const std::string& mesg) const {
+  typedef void(__fastcall* ChatSendFunction)(void* This, void* thiscall_garbage, char* msg, u32 length, u32* rv);
+
+  if (mesg.empty()) return;
+
+  // The address to the current text input buffer
+  std::size_t chat_input_addr = game_addr_ + 0x2DD14;
+  char* input = (char*)(chat_input_addr);
+
+  memcpy(input, mesg.c_str(), mesg.length());
+  input[mesg.length()] = 0;
+
+  ChatSendFunction send_func = (ChatSendFunction)(*(u32*)(module_base_continuum_ + 0xAC30C));
+  u32 rv = 0;
+
+  void* This = (void*)(game_addr_ + 0x2DBF0);
+
+  send_func(This, nullptr, input, mesg.length(), &rv);
+
+  // Clear the text buffer after sending the message
+  input[0] = 0;
+}
+
 }  // namespace marvin

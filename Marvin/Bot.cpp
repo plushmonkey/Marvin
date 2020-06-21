@@ -329,7 +329,7 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
     if (distance < distance_min) {
       ctx.bot->Move(target_position, distance_min);
     } else if (distance > distance_max) {
-      ctx.bot->Move(target_position, hover_distance);
+      ctx.bot->Move(target_position, distance_max);
     }
 
     float max_speed = game.GetShipSettings().MaximumSpeed / 10.0f / 16.0f;
@@ -337,17 +337,39 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
     const Player& shooter =
         *ctx.blackboard.ValueOr<const Player*>("target_player", nullptr);
 
+#if 0
+    Vector2f dodge;
+    for (auto& player : game.GetPlayers()) {
+      if (player.position.DistanceSq(game.GetPlayer().position) > 25 * 25) continue;
+      if (player.id == game.GetPlayer().id) continue;
+      if (player.frequency == game.GetPlayer().frequency) continue;
+      if (player.name[0] == '<') continue;
+      if (player.ship > 7) continue;
+
+      Vector2f delta;
+
+      if (energy_pct < 0.75f && IsAimingAt(game, player, game.GetPlayer(), &delta)) {
+        dodge += delta;
+      }
+    }
+
+    if (dodge.LengthSq() > 0) {
+      ctx.bot->GetSteering().Seek(game.GetPosition() + dodge, 100.0f);
+      return behavior::ExecuteResult::Success;
+    }
+#else
     float dodge_dist_sq = (distance_min * 0.35f) * (distance_min * 0.35f);
 
     if (game.GetPlayer().position.DistanceSq(shooter.position) >
         dodge_dist_sq) {
       Vector2f dodge;
 
-      if (energy_pct < 0.75 && IsAimingAt(game, shooter, game.GetPlayer(), &dodge)) {
+      if (energy_pct < 0.75f && IsAimingAt(game, shooter, game.GetPlayer(), &dodge)) {
         ctx.bot->GetSteering().Seek(game.GetPosition() + dodge, 100.0f);
         return behavior::ExecuteResult::Success;
       }
     }
+#endif
 
     ctx.bot->GetSteering().Face(target_position);
 
@@ -357,9 +379,11 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
  private:
   bool IsAimingAt(GameProxy& game, const Player& shooter, const Player& target,
                   Vector2f* dodge) {
+    const float kRadiusMultiplier = 1.5f;
+
     float proj_speed =
         game.GetShipSettings(shooter.ship).BulletSpeed / 10.0f / 16.0f;
-    float radius = game.GetShipSettings(target.ship).GetRadius() * 1.5f;
+    float radius = game.GetShipSettings(target.ship).GetRadius() * kRadiusMultiplier;
     Vector2f box_pos = target.position - Vector2f(radius, radius);
 
     Vector2f shoot_direction =
@@ -372,7 +396,7 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
     Vector2f extent(radius * 2, radius * 2);
 
     float shooter_radius = game.GetShipSettings(shooter.ship).GetRadius();
-    Vector2f side = Perpendicular(shooter.GetHeading()) * shooter_radius * 1.5f;
+    Vector2f side = Perpendicular(shooter.GetHeading()) * shooter_radius * kRadiusMultiplier;
 
     float distance;
 
@@ -386,9 +410,12 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
           RayBoxIntersect(shooter.position - side, direction, box_pos, extent,
                           &distance, nullptr)) {
 #if 0
-        Vector2f hit = shooter.position + shoot_direction * distance;
+        if (distance < 30) {
+          Vector2f hit = shooter.position + shoot_direction * distance;
 
-        *dodge = Normalize(side * side.Dot(Normalize(hit - target.position)));
+          *dodge = Normalize(side * side.Dot(Normalize(hit - target.position)));
+          return true;
+        }
 #endif
 
         if (distance < 30) {
@@ -632,7 +659,7 @@ void Bot::Steer() {
     keys_.Set(VK_LEFT, !clockwise);
   }
 
-#ifdef DEBUG_RENDER
+#if DEBUG_RENDER
 
   if (has_force) {
     Vector2f force_direction = Normalize(force);

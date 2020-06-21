@@ -33,6 +33,8 @@ class GameProxy {
   virtual bool SetShip(int ship) = 0;
   virtual void Warp() = 0;
   virtual void Cloak(KeyController& keys) = 0;
+
+  virtual void SendChatMessage(const std::string& mesg) const = 0;
 };
 
 }  // namespace marvin
