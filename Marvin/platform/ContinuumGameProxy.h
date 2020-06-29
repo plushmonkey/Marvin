@@ -24,6 +24,7 @@ class ContinuumGameProxy : public GameProxy {
   std::string GetServerFolder() const;
   const Map& GetMap() const override;
   const Player& GetPlayer() const override;
+  const Player& GetSelectedPlayer() const override;
 
   bool SetShip(int ship) override;
   void Warp() override;

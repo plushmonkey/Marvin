@@ -45,6 +45,8 @@ void ContinuumGameProxy::FetchPlayers() {
   const std::size_t kPosOffset = 0x04;
   const std::size_t kVelocityOffset = 0x10;
   const std::size_t kIdOffset = 0x18;
+  const std::size_t kBountyOffset1 = 0x20;
+  const std::size_t kBountyOffset2 = 0x24;
   const std::size_t kRotOffset = 0x3C;
   const std::size_t kShipOffset = 0x5C;
   const std::size_t kFreqOffset = 0x58;
@@ -93,14 +95,23 @@ void ContinuumGameProxy::FetchPlayers() {
 
     player.name = process_.ReadString(player_addr + kNameOffset, 23);
 
-    // Energy calculation @4485FA
-    u32 energy1 = process_.ReadU32(player_addr + kEnergyOffset1);
-    u32 energy2 = process_.ReadU32(player_addr + kEnergyOffset2);
+    player.bounty = *(u32*)(player_addr + kBountyOffset1) + *(u32*)(player_addr + kBountyOffset2);
 
-    u32 combined = energy1 + energy2;
-    u64 energy = ((combined * (u64)0x10624DD3) >> 32) >> 6;
+    if (player.id == player_id_) {
+      // Energy calculation @4485FA
+      u32 energy1 = process_.ReadU32(player_addr + kEnergyOffset1);
+      u32 energy2 = process_.ReadU32(player_addr + kEnergyOffset2);
 
-    player.energy = static_cast<uint16_t>(energy);
+      u32 combined = energy1 + energy2;
+      u64 energy = ((combined * (u64)0x10624DD3) >> 32) >> 6;
+
+      player.energy = static_cast<uint16_t>(energy);
+    } else {
+      u32 first = *(u32*)(player_addr + 0x150);
+      u32 second = *(u32*)(player_addr + 0x154);
+
+      player.energy = static_cast<uint16_t>(first + second);
+    }
 
     players_.emplace_back(player);
 
@@ -159,6 +170,12 @@ const std::vector<Player>& ContinuumGameProxy::GetPlayers() const {
 
 const Map& ContinuumGameProxy::GetMap() const { return *map_; }
 const Player& ContinuumGameProxy::GetPlayer() const { return *player_; }
+
+const Player& ContinuumGameProxy::GetSelectedPlayer() const {
+  u32 selected_index = *(u32*)(game_addr_ + 0x127EC + 0x1B758);
+
+  return players_[selected_index];
+}
 
 // TODO: Find level data or level name in memory
 std::string ContinuumGameProxy::GetServerFolder() const {

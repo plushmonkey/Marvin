@@ -37,7 +37,11 @@ SHORT WINAPI OverrideGetAsyncKeyState(int vKey) {
 #else
   if (!g_Enabled) {
 #endif
-    return RealGetAsyncKeyState(vKey);
+    if (GetActiveWindow() == g_hWnd) {
+      return RealGetAsyncKeyState(vKey);
+    }
+
+    return 0;
   }
 
   if (g_Bot->GetKeys().IsPressed(vKey)) {

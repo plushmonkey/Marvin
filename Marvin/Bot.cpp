@@ -568,6 +568,7 @@ void Bot::Update(float dt) {
   keys_.ReleaseAll();
   game_->Update(dt);
 
+#if !DEBUG_USER_CONTROL
   if (game_->GetPlayer().ship > 7) {
     uint64_t timestamp = GetTime();
 
@@ -578,6 +579,7 @@ void Bot::Update(float dt) {
     }
     return;
   }
+#endif
 
   steering_.Reset();
 

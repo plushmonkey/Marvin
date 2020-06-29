@@ -27,6 +27,7 @@ class GameProxy {
   virtual const ShipSettings& GetShipSettings(int ship) const = 0;
   virtual const Map& GetMap() const = 0;
   virtual const Player& GetPlayer() const = 0;
+  virtual const Player& GetSelectedPlayer() const = 0;
 
   // May need to be called more than once to transition the game menu
   // Returns true if it attempts to set the ship this call.
