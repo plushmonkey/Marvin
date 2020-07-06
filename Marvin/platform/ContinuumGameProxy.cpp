@@ -39,6 +39,24 @@ void ContinuumGameProxy::Update(float dt) {
   SetWindowFocus();
 
   FetchPlayers();
+
+  // Grab the address to the main player structure
+  u32 player_addr = *(u32*)(game_addr_ + 0x13070);
+
+  // Follow a pointer that leads to weapon data
+  u32 ptr = *(u32*)(player_addr + 0x0C);
+  u32 weapon_count = *(u32*)(ptr + 0x1DD0) + *(u32*)(ptr + 0x1DD4);
+  u32 weapon_ptrs = (ptr + 0x21F4);
+
+  weapons_.clear();
+
+  for (size_t i = 0; i < weapon_count; ++i) {
+    u32 weapon_data = *(u32*)(weapon_ptrs + i * 4);
+
+    WeaponData* data = (WeaponData*)(weapon_data);
+
+    weapons_.emplace_back(data);
+  }
 }
 
 void ContinuumGameProxy::FetchPlayers() {
@@ -95,7 +113,8 @@ void ContinuumGameProxy::FetchPlayers() {
 
     player.name = process_.ReadString(player_addr + kNameOffset, 23);
 
-    player.bounty = *(u32*)(player_addr + kBountyOffset1) + *(u32*)(player_addr + kBountyOffset2);
+    player.bounty = *(u32*)(player_addr + kBountyOffset1) +
+                    *(u32*)(player_addr + kBountyOffset2);
 
     if (player.id == player_id_) {
       // Energy calculation @4485FA
@@ -119,6 +138,16 @@ void ContinuumGameProxy::FetchPlayers() {
       player_ = &players_.back();
     }
   }
+}
+
+std::vector<Weapon*> ContinuumGameProxy::GetWeapons() {
+  std::vector<Weapon*> weapons;
+
+  for (std::size_t i = 0; i < weapons_.size(); ++i) {
+    weapons.push_back(&weapons_[i]);
+  }
+
+  return weapons;
 }
 
 const ClientSettings& ContinuumGameProxy::GetSettings() const {
@@ -177,6 +206,16 @@ const Player& ContinuumGameProxy::GetSelectedPlayer() const {
   return players_[selected_index];
 }
 
+const Player* ContinuumGameProxy::GetPlayerById(u16 id) const {
+  for (std::size_t i = 0; i < players_.size(); ++i) {
+    if (players_[i].id == id) {
+      return &players_[i];
+    }
+  }
+
+  return nullptr;
+}
+
 // TODO: Find level data or level name in memory
 std::string ContinuumGameProxy::GetServerFolder() const {
   std::size_t folder_addr = *(uint32_t*)(game_addr_ + 0x127ec + 0x5a3c) + 0x10D;
@@ -220,7 +259,9 @@ void ContinuumGameProxy::SendKey(int vKey) {
 }
 
 void ContinuumGameProxy::SendChatMessage(const std::string& mesg) const {
-  typedef void(__fastcall* ChatSendFunction)(void* This, void* thiscall_garbage, char* msg, u32* unknown1, u32* unknown2);
+  typedef void(__fastcall * ChatSendFunction)(void* This,
+                                              void* thiscall_garbage, char* msg,
+                                              u32* unknown1, u32* unknown2);
 
   if (mesg.empty()) return;
 
@@ -231,7 +272,8 @@ void ContinuumGameProxy::SendChatMessage(const std::string& mesg) const {
   memcpy(input, mesg.c_str(), mesg.length());
   input[mesg.length()] = 0;
 
-  ChatSendFunction send_func = (ChatSendFunction)(*(u32*)(module_base_continuum_ + 0xAC30C));
+  ChatSendFunction send_func =
+      (ChatSendFunction)(*(u32*)(module_base_continuum_ + 0xAC30C));
   void* This = (void*)(game_addr_ + 0x2DBF0);
 
   // Some value that the client passes in for some reason

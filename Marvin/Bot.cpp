@@ -235,7 +235,8 @@ class BundleShots : public behavior::BehaviorNode {
       running_ = true;
     }
 
-    RenderText("BundleShots", GetWindowCenter() + Vector2f(0, 100), RGB(100, 100, 100), RenderText_Centered);
+    RenderText("BundleShots", GetWindowCenter() + Vector2f(0, 100),
+               RGB(100, 100, 100), RenderText_Centered);
 
     ctx.bot->Move(target.position, 0.0f);
     ctx.bot->GetSteering().Face(target.position);
@@ -337,6 +338,55 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
     const Player& shooter =
         *ctx.blackboard.ValueOr<const Player*>("target_player", nullptr);
 
+#if 0  // Simple weapon avoidance but doesn't work great
+    bool weapon_dodged = false;
+    for (Weapon* weapon : game.GetWeapons()) {
+      const Player* weapon_player = game.GetPlayerById(weapon->GetPlayerId());
+
+      if (weapon_player == nullptr) continue;
+
+      if (weapon_player->frequency == game.GetPlayer().frequency) continue;
+
+      const auto& player = game.GetPlayer();
+
+      if (weapon->GetType() & 0x8F00 && weapon->GetPosition().DistanceSq(player.position) < 20 * 20) {
+        Vector2f direction = Normalize(player.position - weapon->GetPosition());
+        Vector2f perp = Perpendicular(direction);
+
+        if (perp.Dot(player.velocity) < 0) {
+          perp = -perp;
+        }
+
+        ctx.bot->GetSteering().Seek(player.position + perp, 100.0f);
+        weapon_dodged = true;
+      } else if (weapon->GetPosition().DistanceSq(player.position) < 50 * 50) {
+        Vector2f direction = Normalize(weapon->GetVelocity());
+
+        float radius = game.GetShipSettings(player.ship).GetRadius() * 6.0f;
+        Vector2f box_pos = player.position - Vector2f(radius, radius);
+        Vector2f extent(radius * 2, radius * 2);
+
+        float dist;
+        Vector2f norm;
+
+        if (RayBoxIntersect(weapon->GetPosition(), direction, box_pos, extent, &dist, &norm)) {
+          Vector2f perp = Perpendicular(direction);
+
+          if (perp.Dot(player.velocity) < 0) {
+            perp = perp * -1.0f;
+          }
+
+          ctx.bot->GetSteering().Seek(player.position + perp, 2.0f);
+          weapon_dodged = true;
+        }
+      }
+    }
+
+    if (weapon_dodged) {
+      return behavior::ExecuteResult::Success;
+    }
+#endif
+
 #if 0
     Vector2f dodge;
     for (auto& player : game.GetPlayers()) {
@@ -364,14 +414,17 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
         dodge_dist_sq) {
       Vector2f dodge;
 
-      if (energy_pct < 0.75f && IsAimingAt(game, shooter, game.GetPlayer(), &dodge)) {
+      if (energy_pct < 0.75f &&
+          IsAimingAt(game, shooter, game.GetPlayer(), &dodge)) {
         ctx.bot->GetSteering().Seek(game.GetPosition() + dodge, 100.0f);
         return behavior::ExecuteResult::Success;
       }
     }
 #endif
 
-    ctx.bot->GetSteering().Face(target_position);
+    if (energy_pct > 0.35f) {
+      ctx.bot->GetSteering().Face(target_position);
+    }
 
     return behavior::ExecuteResult::Success;
   }
@@ -383,7 +436,8 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
 
     float proj_speed =
         game.GetShipSettings(shooter.ship).BulletSpeed / 10.0f / 16.0f;
-    float radius = game.GetShipSettings(target.ship).GetRadius() * kRadiusMultiplier;
+    float radius =
+        game.GetShipSettings(target.ship).GetRadius() * kRadiusMultiplier;
     Vector2f box_pos = target.position - Vector2f(radius, radius);
 
     Vector2f shoot_direction =
@@ -396,7 +450,8 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
     Vector2f extent(radius * 2, radius * 2);
 
     float shooter_radius = game.GetShipSettings(shooter.ship).GetRadius();
-    Vector2f side = Perpendicular(shooter.GetHeading()) * shooter_radius * kRadiusMultiplier;
+    Vector2f side = Perpendicular(shooter.GetHeading()) * shooter_radius *
+                    kRadiusMultiplier;
 
     float distance;
 
@@ -679,12 +734,12 @@ void Bot::Steer() {
 
   if (rotation == 0.0f) {
     RenderText("no rotation", center - Vector2f(0, debug_y), RGB(100, 100, 100),
-      RenderText_Centered);
+               RenderText_Centered);
     debug_y -= 20;
   } else {
     std::string text = "rotation: " + std::to_string(rotation);
     RenderText(text.c_str(), center - Vector2f(0, debug_y), RGB(100, 100, 100),
-      RenderText_Centered);
+               RenderText_Centered);
     debug_y -= 20;
   }
 
