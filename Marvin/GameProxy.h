@@ -21,6 +21,14 @@ class Weapon {
   virtual u16 GetType() const = 0;
 };
 
+struct ShipStatus {
+  u32 recharge;
+  u32 thrust;
+  u32 speed;
+  u32 rotation;
+  u32 shrapnel;
+};
+
 class GameProxy {
  public:
   virtual ~GameProxy() {}
@@ -34,6 +42,7 @@ class GameProxy {
   virtual const ClientSettings& GetSettings() const = 0;
   virtual const ShipSettings& GetShipSettings() const = 0;
   virtual const ShipSettings& GetShipSettings(int ship) const = 0;
+  virtual const ShipStatus& GetShipStatus() const = 0;
   virtual const Map& GetMap() const = 0;
 
   virtual const Player& GetPlayer() const = 0;

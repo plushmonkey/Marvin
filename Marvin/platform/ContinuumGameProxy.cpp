@@ -5,6 +5,7 @@
 
 #include "../Bot.h"
 #include "../Map.h"
+#include "../Debug.h"
 
 namespace marvin {
 
@@ -136,8 +137,19 @@ void ContinuumGameProxy::FetchPlayers() {
 
     if (player.id == player_id_) {
       player_ = &players_.back();
-    }
+
+      // @448D37
+      ship_status_.rotation = *(u32*)(player_addr + 0x278) + *(u32*)(player_addr + 0x274);
+      ship_status_.recharge = *(u32*)(player_addr + 0x1E8) + *(u32*)(player_addr + 0x1EC);
+      ship_status_.shrapnel = *(u32*)(player_addr + 0x2A8) + *(u32*)(player_addr + 0x2AC);
+      ship_status_.thrust = *(u32*)(player_addr + 0x244) + *(u32*)(player_addr + 0x248);
+      ship_status_.speed = *(u32*)(player_addr + 0x350) + *(u32*)(player_addr + 0x354);
+    } 
   }
+}
+
+const ShipStatus& ContinuumGameProxy::GetShipStatus() const {
+  return ship_status_;
 }
 
 std::vector<Weapon*> ContinuumGameProxy::GetWeapons() {

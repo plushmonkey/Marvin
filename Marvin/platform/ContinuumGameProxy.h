@@ -63,6 +63,7 @@ class ContinuumGameProxy : public GameProxy {
   const ClientSettings& GetSettings() const override;
   const ShipSettings& GetShipSettings() const override;
   const ShipSettings& GetShipSettings(int ship) const override;
+  const ShipStatus& GetShipStatus() const override;
   std::string GetServerFolder() const;
   const Map& GetMap() const override;
 
@@ -97,6 +98,7 @@ class ContinuumGameProxy : public GameProxy {
   Player* player_;
   std::vector<Player> players_;
   std::vector<ContinuumWeapon> weapons_;
+  ShipStatus ship_status_;
 };
 
 }  // namespace marvin
