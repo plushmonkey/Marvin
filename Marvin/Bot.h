@@ -180,9 +180,9 @@ class FindEnemyNode : public behavior::BehaviorNode {
                       const Player& target) {
     float dist = bot_player.position.Distance(target.position);
     // How many seconds it takes to rotate 180 degrees
-    float rotate_speed = game.GetShipSettings().MaximumRotation / 200.0f;
+    float rotate_speed = game.GetShipStatus().rotation / 200.0f;
     float move_cost =
-        dist / (game.GetShipSettings().MaximumSpeed / 10.0f / 16.0f);
+        dist / (game.GetShipStatus().speed / 10.0f / 16.0f);
     Vector2f direction = Normalize(target.position - bot_player.position);
     float dot = std::abs(bot_player.GetHeading().Dot(direction) - 1.0f) / 2.0f;
     float rotate_cost = std::abs(dot) * rotate_speed;

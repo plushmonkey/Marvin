@@ -333,12 +333,10 @@ class MoveToEnemyNode : public behavior::BehaviorNode {
       ctx.bot->Move(target_position, distance_max);
     }
 
-    float max_speed = game.GetShipSettings().MaximumSpeed / 10.0f / 16.0f;
-
     const Player& shooter =
         *ctx.blackboard.ValueOr<const Player*>("target_player", nullptr);
 
-#if 0  // Simple weapon avoidance but doesn't work great
+#if 0 // Simple weapon avoidance but doesn't work great
     bool weapon_dodged = false;
     for (Weapon* weapon : game.GetWeapons()) {
       const Player* weapon_player = game.GetPlayerById(weapon->GetPlayerId());
@@ -722,7 +720,7 @@ void Bot::Steer() {
     Vector2f force_direction = Normalize(force);
     float force_percent =
         force.Length() /
-        (GetGame().GetShipSettings().MaximumSpeed / 16.0f / 16.0f);
+        (GetGame().GetShipStatus().speed / 16.0f / 16.0f);
     RenderLine(center, center + (force_direction * 100 * force_percent),
                RGB(255, 255, 0));
   }

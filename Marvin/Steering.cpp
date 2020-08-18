@@ -14,7 +14,7 @@ float GetCurrentSpeed(Bot& bot) {
 
 // Context sensitive max speed to handle wormhole increases
 float GetMaxSpeed(Bot& bot) {
-  float speed = bot.GetGame().GetShipSettings().MaximumSpeed / 10.0f / 16.0f;
+    float speed = bot.GetGame().GetShipStatus().speed / 10.0f / 16.0f;
 
   if (GetCurrentSpeed(bot) > speed) {
     speed = std::abs(speed + bot.GetGame().GetShipSettings().GravityTopSpeed);
