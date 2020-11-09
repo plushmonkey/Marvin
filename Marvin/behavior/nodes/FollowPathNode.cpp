@@ -15,9 +15,20 @@ ExecuteResult FollowPathNode::Execute(ExecuteContext& ctx) {
 
   auto& game = ctx.bot->GetGame();
   Vector2f current = path.front();
+  Vector2f from = game.GetPosition();
+
+  // Fix an issue where the pathfinder generates nodes in the center of the tile
+  // but the ship can't occupy the exact center. This is only an issue without path smoothing.
+  if (!path.empty() && (u16)from.x == (u16)path.at(0).x && (u16)from.y == (u16)path.at(0).y) {
+    path.erase(path.begin());
+
+    if (!path.empty()) {
+      current = path.front();
+    }
+  }
 
   while (path.size() > 1 &&
-         CanMoveBetween(game, game.GetPosition(), path.at(1))) {
+         CanMoveBetween(game, from, path.at(1))) {
     path.erase(path.begin());
     current = path.front();
   }

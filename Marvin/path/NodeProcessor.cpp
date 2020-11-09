@@ -48,6 +48,7 @@ void NodeProcessor::ResetNodes() {
     node->openset = false;
     node->g = node->h = node->f = 0;
     node->parent = nullptr;
+    node->rotations = 0;
   }
 }
 

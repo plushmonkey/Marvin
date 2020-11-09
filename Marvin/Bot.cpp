@@ -609,12 +609,39 @@ Bot::Bot(std::unique_ptr<GameProxy> game)
       std::make_unique<behavior::BehaviorEngine>(behavior_nodes_.back().get());
 
   regions_ = RegionRegistry::Create(game_->GetMap());
+  pathfinder_->CreateMapWeights(game_->GetMap());
 
   behavior_ctx_.blackboard.Set(
       "patrol_nodes",
       std::vector<Vector2f>({Vector2f(585, 540), Vector2f(400, 570)}));
 
   behavior_ctx_.blackboard.Set("patrol_index", 0);
+}
+
+void RenderWorldLine(Vector2f screenCenterWorldPosition, Vector2f from, Vector2f to) {
+  Vector2f center = GetWindowCenter();
+
+  Vector2f diff = to - from;
+  from = (from - screenCenterWorldPosition) * 16.0f;
+  to = from + (diff * 16.0f);
+
+  RenderLine(center + from, center + to, RGB(200, 0, 0));
+}
+
+void RenderPath(GameProxy& game, behavior::Blackboard& blackboard) {
+  std::vector<Vector2f> path = blackboard.ValueOr("path", std::vector<Vector2f>());
+  const Player& player = game.GetPlayer();
+
+  for (std::size_t i = 0; i < path.size() - 1; ++i) {
+    Vector2f current = path[i];
+    Vector2f next = path[i + 1];
+
+    if (i == 0) {
+      RenderWorldLine(player.position, player.position, current);
+    }
+
+    RenderWorldLine(player.position, current, next);
+  }
 }
 
 void Bot::Update(float dt) {
@@ -640,6 +667,10 @@ void Bot::Update(float dt) {
   behavior_ctx_.dt = dt;
 
   behavior_->Update(behavior_ctx_);
+
+#if DEBUG_RENDER
+  RenderPath(GetGame(), behavior_ctx_.blackboard);
+#endif
 
   Steer();
 }

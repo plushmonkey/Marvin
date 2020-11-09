@@ -26,6 +26,7 @@ struct Node {
   float h;
   float f;
   float weight;
+  uint32_t rotations;
   bool closed;
   bool openset;
 
@@ -36,7 +37,8 @@ struct Node {
         g(0),
         h(0),
         f(0),
-        weight(1) {}
+        weight(1),
+        rotations(0) {}
 };
 
 }  // namespace path

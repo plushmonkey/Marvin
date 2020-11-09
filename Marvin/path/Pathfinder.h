@@ -52,9 +52,12 @@ struct Pathfinder {
   std::vector<Vector2f> SmoothPath(const std::vector<Vector2f>& path,
                                    const Map& map, float ship_radius);
 
+  void CreateMapWeights(const Map& map);
+
  private:
   struct NodeCompare {
     bool operator()(const Node* lhs, const Node* rhs) const {
+      if (lhs->f == rhs->f) return lhs->rotations > rhs->rotations;
       return lhs->f > rhs->f;
     }
   };
