@@ -62,12 +62,10 @@ float Euclidean(const Node* from, const Node* to) {
   return std::sqrt(dx * dx + dy * dy);
 }
 
-Pathfinder::Pathfinder(std::unique_ptr<NodeProcessor> processor,
-                       RegionRegistry& regions)
+Pathfinder::Pathfinder(std::unique_ptr<NodeProcessor> processor, RegionRegistry& regions)
     : processor_(std::move(processor)), regions_(regions) {}
 
-std::vector<Vector2f> Pathfinder::FindPath(const Vector2f& from,
-                                           const Vector2f& to, float radius) {
+std::vector<Vector2f> Pathfinder::FindPath(const Vector2f& from, const Vector2f& to, float radius) {
   std::vector<Vector2f> path;
 
   processor_->ResetNodes();
@@ -79,8 +77,7 @@ std::vector<Vector2f> Pathfinder::FindPath(const Vector2f& from,
     return path;
   }
 
-  if (!regions_.IsConnected(MapCoord(start->point.x, start->point.y),
-                            MapCoord(goal->point.x, goal->point.y))) {
+  if (!regions_.IsConnected(MapCoord(start->point.x, start->point.y), MapCoord(goal->point.x, goal->point.y))) {
     return path;
   }
 
@@ -96,8 +93,7 @@ std::vector<Vector2f> Pathfinder::FindPath(const Vector2f& from,
 
     node->closed = true;
 
-    NodeConnections connections =
-        processor_->FindEdges(node, start, goal, radius);
+    NodeConnections connections = processor_->FindEdges(node, start, goal, radius);
 
     for (std::size_t i = 0; i < connections.count; ++i) {
       Node* edge = connections.neighbors[i];
@@ -108,15 +104,12 @@ std::vector<Vector2f> Pathfinder::FindPath(const Vector2f& from,
 
       Node* parent = node->parent;
       if (parent) {
-        NodePoint parent_diff(parent->point.x - node->point.x,
-                              parent->point.y - node->point.y);
-        NodePoint current_diff(node->point.x - edge->point.x,
-                               node->point.y - edge->point.y);
+        NodePoint parent_diff(parent->point.x - node->point.x, parent->point.y - node->point.y);
+        NodePoint current_diff(node->point.x - edge->point.x, node->point.y - edge->point.y);
 
         edge->rotations = node->rotations;
 
-        if (parent_diff.x != current_diff.x ||
-            parent_diff.y != current_diff.y) {
+        if (parent_diff.x != current_diff.x || parent_diff.y != current_diff.y) {
           ++edge->rotations;
         }
       }
@@ -164,9 +157,7 @@ std::vector<Vector2f> Pathfinder::FindPath(const Vector2f& from,
   return path;
 }
 
-std::vector<Vector2f> Pathfinder::SmoothPath(const std::vector<Vector2f>& path,
-                                             const Map& map,
-                                             float ship_radius) {
+std::vector<Vector2f> Pathfinder::SmoothPath(const std::vector<Vector2f>& path, const Map& map, float ship_radius) {
   std::vector<Vector2f> result;
 
   // How far away it should try to push the path from walls
@@ -180,8 +171,7 @@ std::vector<Vector2f> Pathfinder::SmoothPath(const std::vector<Vector2f>& path,
 
   for (std::size_t i = 1; i < path.size(); ++i) {
     Vector2f current = path[i];
-    Vector2f closest =
-        ClosestWall(map, current, (int)std::ceil(push_distance + 1));
+    Vector2f closest = ClosestWall(map, current, (int)std::ceil(push_distance + 1));
     Vector2f new_pos = current;
 
     if (closest != Vector2f(0, 0)) {
@@ -211,11 +201,12 @@ std::vector<Vector2f> Pathfinder::SmoothPath(const std::vector<Vector2f>& path,
     result[i] = new_pos;
   }
 
-#if 1  // Don't cull the path if this is enabled
+#if 1 // Don't cull the path if this is enabled
   return result;
 #endif
 
-  if (result.size() <= 2) return result;
+  if (result.size() <= 2)
+    return result;
 
   std::vector<Vector2f> minimum;
   minimum.reserve(result.size());
@@ -278,7 +269,8 @@ float GetWallDistance(const Map& map, u16 x, u16 y, u16 radius) {
 void Pathfinder::CreateMapWeights(const Map& map) {
   for (u16 y = 0; y < 1024; ++y) {
     for (u16 x = 0; x < 1024; ++x) {
-      if (map.IsSolid(x, y)) continue;
+      if (map.IsSolid(x, y))
+        continue;
 
       Node* node = this->processor_->GetNode(NodePoint(x, y));
 
@@ -286,7 +278,8 @@ void Pathfinder::CreateMapWeights(const Map& map) {
 
       float distance = GetWallDistance(map, x, y, close_distance);
 
-      if (distance == 0) distance = 1;
+      if (distance == 0)
+        distance = 1;
 
       if (distance < close_distance) {
         node->weight = 50.0f / distance;
@@ -295,5 +288,5 @@ void Pathfinder::CreateMapWeights(const Map& map) {
   }
 }
 
-}  // namespace path
-}  // namespace marvin
+} // namespace path
+} // namespace marvin

@@ -27,14 +27,14 @@ struct MapCoord {
   }
 };
 
-}  // namespace marvin
+} // namespace marvin
 
 MAKE_HASHABLE(marvin::MapCoord, t.x, t.y);
 
 namespace marvin {
 
 class RegionRegistry {
- public:
+public:
   static std::unique_ptr<RegionRegistry> Create(const Map& map);
 
   bool IsConnected(MapCoord a, MapCoord b) const;
@@ -44,11 +44,11 @@ class RegionRegistry {
 
   RegionIndex CreateRegion();
 
- private:
+private:
   RegionRegistry();
 
   std::unordered_map<MapCoord, RegionIndex> coord_regions_;
   RegionIndex region_count_;
 };
 
-}  // namespace marvin
+} // namespace marvin

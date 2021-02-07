@@ -7,21 +7,28 @@ namespace marvin {
 Map::Map(const TileData& tile_data) : tile_data_(tile_data) {}
 
 TileId Map::GetTileId(u16 x, u16 y) const {
-  if (x >= 1024 || y >= 1024) return 0;
+  if (x >= 1024 || y >= 1024)
+    return 0;
   return tile_data_[y * kMapExtent + x];
 }
 
 bool Map::IsSolid(u16 x, u16 y) const {
-  if (x >= 1024 || y >= 1024) return true;
+  if (x >= 1024 || y >= 1024)
+    return true;
   return IsSolid(GetTileId(x, y));
 }
 
 bool Map::IsSolid(TileId id) const {
-  if (id == 0) return false;
-  if (id >= 162 && id <= 169) return false;  // treat doors as non-solid
-  if (id < 170) return true;
-  if (id >= 192 && id <= 240) return true;
-  if (id >= 242 && id <= 252) return true;
+  if (id == 0)
+    return false;
+  if (id >= 162 && id <= 169)
+    return false; // treat doors as non-solid
+  if (id < 170)
+    return true;
+  if (id >= 192 && id <= 240)
+    return true;
+  if (id >= 242 && id <= 252)
+    return true;
 
   return false;
 }
@@ -66,7 +73,8 @@ struct Tile {
 std::unique_ptr<Map> Map::Load(const char* filename) {
   std::ifstream input(filename, std::ios::in | std::ios::binary);
 
-  if (!input.is_open()) return nullptr;
+  if (!input.is_open())
+    return nullptr;
 
   input.seekg(0, std::ios::end);
   std::size_t size = static_cast<std::size_t>(input.tellg());
@@ -122,4 +130,4 @@ std::unique_ptr<Map> Map::Load(const std::string& filename) {
   return Load(filename.c_str());
 }
 
-}  // namespace marvin
+} // namespace marvin

@@ -5,5 +5,5 @@ namespace path {
 
 struct Path {};
 
-}  // namespace path
-}  // namespace marvin
+} // namespace path
+} // namespace marvin

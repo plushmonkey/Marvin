@@ -39,7 +39,9 @@ void RenderText(const char* text, Vector2f at, COLORREF color, int flags) {
   ReleaseDC(g_hWnd, hdc);
 }
 
-void WaitForSync() { DwmFlush(); }
+void WaitForSync() {
+  DwmFlush();
+}
 
 #else
 
@@ -58,4 +60,4 @@ Vector2f GetWindowCenter() {
   return Vector2f((float)rect.right / 2.0f, (float)rect.bottom / 2.0f);
 }
 
-}  // namespace marvin
+} // namespace marvin

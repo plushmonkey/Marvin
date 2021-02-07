@@ -27,8 +27,7 @@ HWND g_hWnd = 0;
 static time_point g_LastUpdateTime;
 
 static SHORT(WINAPI* RealGetAsyncKeyState)(int vKey) = GetAsyncKeyState;
-static BOOL(WINAPI* RealPeekMessageA)(LPMSG lpMsg, HWND hWnd,
-                                      UINT wMsgFilterMin, UINT wMsgFilterMax,
+static BOOL(WINAPI* RealPeekMessageA)(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin, UINT wMsgFilterMax,
                                       UINT wRemoveMsg) = PeekMessageA;
 
 SHORT WINAPI OverrideGetAsyncKeyState(int vKey) {
@@ -53,8 +52,7 @@ SHORT WINAPI OverrideGetAsyncKeyState(int vKey) {
 
 // This is used to hook into the main update loop in Continuum so the bot can be
 // updated.
-BOOL WINAPI OverridePeekMessageA(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin,
-                                 UINT wMsgFilterMax, UINT wRemoveMsg) {
+BOOL WINAPI OverridePeekMessageA(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin, UINT wMsgFilterMax, UINT wRemoveMsg) {
   // Check for key presses to enable/disable the bot.
   if (GetActiveWindow() == g_hWnd) {
     if (RealGetAsyncKeyState(VK_F10)) {
@@ -79,8 +77,7 @@ BOOL WINAPI OverridePeekMessageA(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin,
   marvin::WaitForSync();
 #endif
 
-  return RealPeekMessageA(lpMsg, hWnd, wMsgFilterMin, wMsgFilterMax,
-                          wRemoveMsg);
+  return RealPeekMessageA(lpMsg, hWnd, wMsgFilterMin, wMsgFilterMax, wRemoveMsg);
 }
 
 HWND GetMainWindow() {

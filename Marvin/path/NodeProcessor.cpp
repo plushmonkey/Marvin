@@ -10,11 +10,13 @@ NodeConnections NodeProcessor::FindEdges(Node* node, Node* start, Node* goal, fl
 
   for (int y = -1; y <= 1; ++y) {
     for (int x = -1; x <= 1; ++x) {
-      if (x == 0 && y == 0) continue;
+      if (x == 0 && y == 0)
+        continue;
       uint16_t world_x = node->point.x + x;
       uint16_t world_y = node->point.y + y;
 
-      if (map_.IsSolid(world_x, world_y)) continue;
+      if (map_.IsSolid(world_x, world_y))
+        continue;
 
       Vector2f check_pos(world_x + 0.5f, world_y + 0.5f);
 
@@ -71,5 +73,5 @@ Node* NodeProcessor::GetNode(NodePoint point) {
   return &nodes_[index];
 }
 
-}  // namespace path
-}  // namespace marvin
+} // namespace path
+} // namespace marvin

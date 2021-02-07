@@ -9,8 +9,10 @@ namespace marvin {
 namespace behavior {
 
 class Blackboard {
- public:
-  bool Has(const std::string& key) { return data_.find(key) != data_.end(); }
+public:
+  bool Has(const std::string& key) {
+    return data_.find(key) != data_.end();
+  }
 
   template <typename T>
   void Set(const std::string& key, const T& value) {
@@ -39,12 +41,16 @@ class Blackboard {
     return Value<T>(key).value_or(or_result);
   }
 
-  void Clear() { data_.clear(); }
-  void Erase(const std::string& key) { data_.erase(key); }
+  void Clear() {
+    data_.clear();
+  }
+  void Erase(const std::string& key) {
+    data_.erase(key);
+  }
 
- private:
+private:
   std::unordered_map<std::string, std::any> data_;
 };
 
-}  // namespace behavior
-}  // namespace marvin
+} // namespace behavior
+} // namespace marvin

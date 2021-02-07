@@ -14,7 +14,7 @@ float GetCurrentSpeed(Bot& bot) {
 
 // Context sensitive max speed to handle wormhole increases
 float GetMaxSpeed(Bot& bot) {
-    float speed = bot.GetGame().GetShipStatus().speed / 10.0f / 16.0f;
+  float speed = bot.GetGame().GetShipStatus().speed / 10.0f / 16.0f;
 
   if (GetCurrentSpeed(bot) > speed) {
     speed = std::abs(speed + bot.GetGame().GetShipSettings().GravityTopSpeed);
@@ -25,9 +25,13 @@ float GetMaxSpeed(Bot& bot) {
 
 SteeringBehavior::SteeringBehavior(Bot* bot) : bot_(bot), rotation_(0.0f) {}
 
-Vector2f SteeringBehavior::GetSteering() { return force_; }
+Vector2f SteeringBehavior::GetSteering() {
+  return force_;
+}
 
-float SteeringBehavior::GetRotation() { return rotation_; }
+float SteeringBehavior::GetRotation() {
+  return rotation_;
+}
 
 void SteeringBehavior::Reset() {
   force_ = Vector2f();
@@ -37,8 +41,7 @@ void SteeringBehavior::Reset() {
 void SteeringBehavior::Seek(Vector2f target, float multiplier) {
   float speed = GetMaxSpeed(*bot_);
 
-  Vector2f desired =
-      Normalize(target - bot_->GetGame().GetPosition()) * speed * multiplier;
+  Vector2f desired = Normalize(target - bot_->GetGame().GetPosition()) * speed * multiplier;
 
   force_ += desired - bot_->GetGame().GetPlayer().velocity;
 }
@@ -85,15 +88,15 @@ void SteeringBehavior::Pursue(const Player& enemy) {
 
 void SteeringBehavior::Face(Vector2f target) {
   Vector2f to_target = target - bot_->GetGame().GetPosition();
-  Vector2f heading =
-      Rotate(bot_->GetGame().GetPlayer().GetHeading(), rotation_);
+  Vector2f heading = Rotate(bot_->GetGame().GetPlayer().GetHeading(), rotation_);
 
-  float rotation =
-      std::atan2(heading.y, heading.x) - std::atan2(to_target.y, to_target.x);
+  float rotation = std::atan2(heading.y, heading.x) - std::atan2(to_target.y, to_target.x);
 
   rotation_ += WrapToPi(rotation);
 }
 
-void SteeringBehavior::AvoidWalls() { auto& game = bot_->GetGame(); }
+void SteeringBehavior::AvoidWalls() {
+  auto& game = bot_->GetGame();
+}
 
-}  // namespace marvin
+} // namespace marvin

@@ -17,7 +17,7 @@ using TileData = std::vector<TileId>;
 constexpr TileId kSafeTileId = 171;
 
 class Map {
- public:
+public:
   Map(const TileData& tile_data);
 
   bool IsSolid(TileId id) const;
@@ -31,8 +31,8 @@ class Map {
   static std::unique_ptr<Map> Load(const char* filename);
   static std::unique_ptr<Map> Load(const std::string& filename);
 
- private:
+private:
   TileData tile_data_;
 };
 
-}  // namespace marvin
+} // namespace marvin

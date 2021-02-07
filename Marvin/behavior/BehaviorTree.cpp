@@ -28,8 +28,7 @@ ExecuteResult SequenceNode::Execute(ExecuteContext& ctx) {
   return ExecuteResult::Success;
 }
 
-ParallelNode::ParallelNode(std::vector<BehaviorNode*> children)
-    : children_(std::move(children)) {}
+ParallelNode::ParallelNode(std::vector<BehaviorNode*> children) : children_(std::move(children)) {}
 
 ExecuteResult ParallelNode::Execute(ExecuteContext& ctx) {
   ExecuteResult result = ExecuteResult::Success;
@@ -37,8 +36,7 @@ ExecuteResult ParallelNode::Execute(ExecuteContext& ctx) {
   for (auto& child : children_) {
     ExecuteResult child_result = child->Execute(ctx);
 
-    if (result == ExecuteResult::Success &&
-        child_result != ExecuteResult::Success) {
+    if (result == ExecuteResult::Success && child_result != ExecuteResult::Success) {
       // TODO: Implement failure policies
       // result = child_result;
     }
@@ -47,8 +45,7 @@ ExecuteResult ParallelNode::Execute(ExecuteContext& ctx) {
   return result;
 }
 
-SelectorNode::SelectorNode(std::vector<BehaviorNode*> children)
-    : children_(std::move(children)) {}
+SelectorNode::SelectorNode(std::vector<BehaviorNode*> children) : children_(std::move(children)) {}
 
 ExecuteResult SelectorNode::Execute(ExecuteContext& ctx) {
   ExecuteResult result = ExecuteResult::Failure;
@@ -56,8 +53,7 @@ ExecuteResult SelectorNode::Execute(ExecuteContext& ctx) {
   for (auto& child : children_) {
     ExecuteResult child_result = child->Execute(ctx);
 
-    if (child_result == ExecuteResult::Running ||
-        child_result == ExecuteResult::Success) {
+    if (child_result == ExecuteResult::Running || child_result == ExecuteResult::Success) {
       return child_result;
     }
   }
@@ -86,5 +82,5 @@ ExecuteResult InvertNode::Execute(ExecuteContext& ctx) {
   return child_result;
 }
 
-}  // namespace behavior
-}  // namespace marvin
+} // namespace behavior
+} // namespace marvin

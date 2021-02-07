@@ -14,11 +14,15 @@ namespace path {
 
 template <typename T, typename Compare, typename Container = std::vector<T>>
 class PriorityQueue {
- public:
+public:
   using const_iterator = typename Container::const_iterator;
 
-  const_iterator begin() const { return container_.cbegin(); }
-  const_iterator end() const { return container_.cend(); }
+  const_iterator begin() const {
+    return container_.cbegin();
+  }
+  const_iterator end() const {
+    return container_.cend();
+  }
 
   void Push(T item) {
     container_.push_back(item);
@@ -36,31 +40,35 @@ class PriorityQueue {
     std::make_heap(container_.begin(), container_.end(), comparator_);
   }
 
-  void Clear() { container_.clear(); }
-  std::size_t Size() const { return container_.size(); }
-  bool Empty() const { return container_.empty(); }
+  void Clear() {
+    container_.clear();
+  }
+  std::size_t Size() const {
+    return container_.size();
+  }
+  bool Empty() const {
+    return container_.empty();
+  }
 
- private:
+private:
   Container container_;
   Compare comparator_;
 };
 
 struct Pathfinder {
- public:
-  Pathfinder(std::unique_ptr<NodeProcessor> processor,
-             RegionRegistry& regions);
-  std::vector<Vector2f> FindPath(const Vector2f& from, const Vector2f& to,
-                                 float radius);
+public:
+  Pathfinder(std::unique_ptr<NodeProcessor> processor, RegionRegistry& regions);
+  std::vector<Vector2f> FindPath(const Vector2f& from, const Vector2f& to, float radius);
 
-  std::vector<Vector2f> SmoothPath(const std::vector<Vector2f>& path,
-                                   const Map& map, float ship_radius);
+  std::vector<Vector2f> SmoothPath(const std::vector<Vector2f>& path, const Map& map, float ship_radius);
 
   void CreateMapWeights(const Map& map);
 
- private:
+private:
   struct NodeCompare {
     bool operator()(const Node* lhs, const Node* rhs) const {
-      if (lhs->f == rhs->f) return lhs->rotations > rhs->rotations;
+      if (lhs->f == rhs->f)
+        return lhs->rotations > rhs->rotations;
       return lhs->f > rhs->f;
     }
   };
@@ -70,5 +78,5 @@ struct Pathfinder {
   PriorityQueue<Node*, NodeCompare> openset_;
 };
 
-}  // namespace path
-}  // namespace marvin
+} // namespace path
+} // namespace marvin

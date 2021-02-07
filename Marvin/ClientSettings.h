@@ -236,7 +236,7 @@ struct PrizeWeightSettings {
   unsigned char Thruster;
   unsigned char TopSpeed;
   unsigned char Recharge;
-  unsigned char Glue;  // Engine Shutdown
+  unsigned char Glue; // Engine Shutdown
   unsigned char MultiFire;
   unsigned char Proximity;
   unsigned char AllWeapons;
@@ -519,4 +519,4 @@ struct ClientSettings {
 };
 #pragma pack(pop)
 
-}  // namespace marvin
+} // namespace marvin

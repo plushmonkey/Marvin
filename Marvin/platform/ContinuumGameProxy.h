@@ -12,15 +12,15 @@ namespace marvin {
 struct WeaponData {
   u32 _unused1;
 
-  u32 x;  // 0x04
-  u32 y;  // 0x08
+  u32 x; // 0x04
+  u32 y; // 0x08
 
   u32 _unuseda;
   i32 velocity_x;
   i32 velocity_y;
   u32 _unused2[32];
 
-  u32 pid;  // 0x98
+  u32 pid; // 0x98
 
   char _unused3[11];
 
@@ -30,28 +30,31 @@ struct WeaponData {
 
 // In memory weapon data
 class ContinuumWeapon : public Weapon {
- public:
+public:
   ContinuumWeapon(WeaponData* data) : weapon_(data) {}
 
-  u16 GetPlayerId() const { return weapon_->pid; }
+  u16 GetPlayerId() const {
+    return weapon_->pid;
+  }
 
   Vector2f GetPosition() const {
     return Vector2f(weapon_->x / 1000.0f / 16.0f, weapon_->y / 1000.0f / 16.0f);
   }
 
   Vector2f GetVelocity() const {
-    return Vector2f(weapon_->velocity_x / 1000.0f / 16.0f,
-                    weapon_->velocity_y / 1000.0f / 16.0f);
+    return Vector2f(weapon_->velocity_x / 1000.0f / 16.0f, weapon_->velocity_y / 1000.0f / 16.0f);
   }
 
-  u16 GetType() const { return weapon_->type; }
+  u16 GetType() const {
+    return weapon_->type;
+  }
 
- private:
+private:
   WeaponData* weapon_;
 };
 
 class ContinuumGameProxy : public GameProxy {
- public:
+public:
   ContinuumGameProxy(HWND hwnd);
 
   void Update(float dt) override;
@@ -84,7 +87,7 @@ class ContinuumGameProxy : public GameProxy {
 
   ExeProcess& GetProcess();
 
- private:
+private:
   void SendKey(int vKey);
   void FetchPlayers();
 
@@ -103,4 +106,4 @@ class ContinuumGameProxy : public GameProxy {
   ShipStatus ship_status_;
 };
 
-}  // namespace marvin
+} // namespace marvin

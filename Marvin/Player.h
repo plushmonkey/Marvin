@@ -37,4 +37,4 @@ struct Player {
   }
 };
 
-}  // namespace marvin
+} // namespace marvin

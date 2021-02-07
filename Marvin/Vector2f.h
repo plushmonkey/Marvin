@@ -7,7 +7,7 @@
 namespace marvin {
 
 class Vector2f {
- public:
+public:
   union {
     struct {
       float x;
@@ -37,9 +37,13 @@ class Vector2f {
     return !(*this == other);
   }
 
-  float operator[](std::size_t index) { return values[index]; }
+  float operator[](std::size_t index) {
+    return values[index];
+  }
 
-  Vector2f operator-() const { return Vector2f(-x, -y); }
+  Vector2f operator-() const {
+    return Vector2f(-x, -y);
+  }
 
   inline Vector2f& operator+=(float v) noexcept {
     x += v;
@@ -83,19 +87,33 @@ class Vector2f {
     return Vector2f(x - other.x, y - other.y);
   }
 
-  inline Vector2f operator+(float v) const { return Vector2f(x + v, y + v); }
+  inline Vector2f operator+(float v) const {
+    return Vector2f(x + v, y + v);
+  }
 
-  inline Vector2f operator-(float v) const { return Vector2f(x - v, y - v); }
+  inline Vector2f operator-(float v) const {
+    return Vector2f(x - v, y - v);
+  }
 
-  inline Vector2f operator*(float v) const { return Vector2f(x * v, y * v); }
+  inline Vector2f operator*(float v) const {
+    return Vector2f(x * v, y * v);
+  }
 
-  inline Vector2f operator/(float v) const { return Vector2f(x / v, y / v); }
+  inline Vector2f operator/(float v) const {
+    return Vector2f(x / v, y / v);
+  }
 
-  inline float operator*(const Vector2f& other) const { return Dot(other); }
+  inline float operator*(const Vector2f& other) const {
+    return Dot(other);
+  }
 
-  inline float Length() const { return std::sqrt(x * x + y * y); }
+  inline float Length() const {
+    return std::sqrt(x * x + y * y);
+  }
 
-  inline float LengthSq() const { return x * x + y * y; }
+  inline float LengthSq() const {
+    return x * x + y * y;
+  }
 
   inline float Distance(const Vector2f& other) const {
     Vector2f to_other = other - *this;
@@ -142,7 +160,9 @@ inline Vector2f Normalize(const Vector2f& v) {
   return result;
 }
 
-inline Vector2f Perpendicular(const Vector2f& v) { return Vector2f(-v.y, v.x); }
+inline Vector2f Perpendicular(const Vector2f& v) {
+  return Vector2f(-v.y, v.x);
+}
 
 inline Vector2f Rotate(const Vector2f& v, float rads) {
   float cosA = std::cos(rads);
@@ -173,8 +193,7 @@ inline float WrapToPi(float rads) {
   return WrapMinMax(rads, -3.14159f, 3.14159f);
 }
 
-
-}  // namespace marvin
+} // namespace marvin
 
 inline std::ostream& operator<<(std::ostream& out, const marvin::Vector2f& v) {
   return out << "(" << v.x << ", " << v.y << ")";

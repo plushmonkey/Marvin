@@ -18,20 +18,30 @@ class GameProxy;
 struct Player;
 
 class Bot {
- public:
+public:
   Bot(std::unique_ptr<GameProxy> game);
 
   void Update(float dt);
 
-  KeyController& GetKeys() { return keys_; }
-  GameProxy& GetGame() { return *game_; }
+  KeyController& GetKeys() {
+    return keys_;
+  }
+  GameProxy& GetGame() {
+    return *game_;
+  }
 
   void Move(const Vector2f& target, float target_distance);
-  path::Pathfinder& GetPathfinder() { return *pathfinder_; }
+  path::Pathfinder& GetPathfinder() {
+    return *pathfinder_;
+  }
 
-  const RegionRegistry& GetRegions() const { return *regions_; }
+  const RegionRegistry& GetRegions() const {
+    return *regions_;
+  }
 
-  SteeringBehavior& GetSteering() { return steering_; }
+  SteeringBehavior& GetSteering() {
+    return steering_;
+  }
 
   uint64_t GetTime() const;
 
@@ -43,7 +53,7 @@ class Bot {
     behavior_ = std::make_unique<behavior::BehaviorEngine>(behavior);
   }
 
- private:
+private:
   void Steer();
 
   std::unique_ptr<GameProxy> game_;
@@ -61,30 +71,24 @@ class Bot {
   KeyController keys_;
 };
 
-bool InRect(marvin::Vector2f pos, marvin::Vector2f min_rect,
-            marvin::Vector2f max_rect);
+bool InRect(marvin::Vector2f pos, marvin::Vector2f min_rect, marvin::Vector2f max_rect);
 
 bool IsValidPosition(marvin::Vector2f position);
 
-bool CanShoot(const marvin::Map& map, const marvin::Player& bot_player,
-              const marvin::Player& target);
+bool CanShoot(const marvin::Map& map, const marvin::Player& bot_player, const marvin::Player& target);
 
-marvin::Vector2f CalculateShot(const marvin::Vector2f& pShooter,
-                               const marvin::Vector2f& pTarget,
-                               const marvin::Vector2f& vShooter,
-                               const marvin::Vector2f& vTarget,
-                               float sProjectile);
+marvin::Vector2f CalculateShot(const marvin::Vector2f& pShooter, const marvin::Vector2f& pTarget,
+                               const marvin::Vector2f& vShooter, const marvin::Vector2f& vTarget, float sProjectile);
 
 class PathingNode : public behavior::BehaviorNode {
- public:
+public:
   using Path = std::vector<Vector2f>;
 
-  virtual behavior::ExecuteResult Execute(
-      behavior::ExecuteContext& ctx) override = 0;
+  virtual behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override = 0;
 
- protected:
-  Path CreatePath(behavior::ExecuteContext& ctx, const std::string& pathname,
-                  Vector2f from, Vector2f to, float radius) {
+protected:
+  Path CreatePath(behavior::ExecuteContext& ctx, const std::string& pathname, Vector2f from, Vector2f to,
+                  float radius) {
     bool build = true;
     auto& game = ctx.bot->GetGame();
 
@@ -103,10 +107,8 @@ class PathingNode : public behavior::BehaviorNode {
 
         // Rebuild the path if the bot isn't in line of sight of its next node.
         CastResult center = RayCast(game.GetMap(), pos, direction, distance);
-        CastResult side1 =
-            RayCast(game.GetMap(), pos + side * radius, direction, distance);
-        CastResult side2 =
-            RayCast(game.GetMap(), pos - side * radius, direction, distance);
+        CastResult side1 = RayCast(game.GetMap(), pos + side * radius, direction, distance);
+        CastResult side2 = RayCast(game.GetMap(), pos - side * radius, direction, distance);
 
         if (!center.hit && !side1.hit && !side2.hit) {
           build = false;
@@ -124,7 +126,7 @@ class PathingNode : public behavior::BehaviorNode {
 };
 
 class FindEnemyNode : public behavior::BehaviorNode {
- public:
+public:
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) {
     behavior::ExecuteResult result = behavior::ExecuteResult::Failure;
     float closest_cost = std::numeric_limits<float>::max();
@@ -139,7 +141,8 @@ class FindEnemyNode : public behavior::BehaviorNode {
     for (std::size_t i = 0; i < game.GetPlayers().size(); ++i) {
       const marvin::Player& player = game.GetPlayers()[i];
 
-      if (!IsValidTarget(ctx, player)) continue;
+      if (!IsValidTarget(ctx, player))
+        continue;
 
       float cost = CalculateCost(game, bot_player, player);
 
@@ -150,8 +153,7 @@ class FindEnemyNode : public behavior::BehaviorNode {
       }
     }
 
-    const Player* current_target =
-        ctx.blackboard.ValueOr<const Player*>("target_player", nullptr);
+    const Player* current_target = ctx.blackboard.ValueOr<const Player*>("target_player", nullptr);
 
     if (current_target && IsValidTarget(ctx, *current_target)) {
       // Calculate the cost to the current target so there's some stickiness
@@ -169,20 +171,17 @@ class FindEnemyNode : public behavior::BehaviorNode {
     }
 
     ctx.blackboard.Set("target_player", target);
-    const Player* r =
-        ctx.blackboard.ValueOr<const Player*>("target_player", nullptr);
+    const Player* r = ctx.blackboard.ValueOr<const Player*>("target_player", nullptr);
 
     return result;
   }
 
- private:
-  float CalculateCost(GameProxy& game, const Player& bot_player,
-                      const Player& target) {
+private:
+  float CalculateCost(GameProxy& game, const Player& bot_player, const Player& target) {
     float dist = bot_player.position.Distance(target.position);
     // How many seconds it takes to rotate 180 degrees
     float rotate_speed = game.GetShipStatus().rotation / 200.0f;
-    float move_cost =
-        dist / (game.GetShipStatus().speed / 10.0f / 16.0f);
+    float move_cost = dist / (game.GetShipStatus().speed / 10.0f / 16.0f);
     Vector2f direction = Normalize(target.position - bot_player.position);
     float dot = std::abs(bot_player.GetHeading().Dot(direction) - 1.0f) / 2.0f;
     float rotate_cost = std::abs(dot) * rotate_speed;
@@ -194,10 +193,14 @@ class FindEnemyNode : public behavior::BehaviorNode {
     const auto& game = ctx.bot->GetGame();
     const Player& bot_player = game.GetPlayer();
 
-    if (target.id == game.GetPlayer().id) return false;
-    if (target.ship > 7) return false;
-    if (target.frequency == game.GetPlayer().frequency) return false;
-    if (target.name[0] == '<') return false;
+    if (target.id == game.GetPlayer().id)
+      return false;
+    if (target.ship > 7)
+      return false;
+    if (target.frequency == game.GetPlayer().frequency)
+      return false;
+    if (target.name[0] == '<')
+      return false;
 
     if (game.GetMap().GetTileId(target.position) == marvin::kSafeTileId) {
       return false;
@@ -218,11 +221,13 @@ class FindEnemyNode : public behavior::BehaviorNode {
     bool cloaking = (target.status & 2) != 0;
 
     if (!(game.GetPlayer().status & 4)) {
-      if (stealthing && cloaking) return false;
+      if (stealthing && cloaking)
+        return false;
 
       bool visible = InRect(target.position, view_min_, view_max_);
 
-      if (stealthing && !visible) return false;
+      if (stealthing && !visible)
+        return false;
     }
 
     return true;
@@ -241,8 +246,7 @@ struct InRegionNode : public behavior::BehaviorNode {
 
     bool connected = ctx.bot->GetRegions().IsConnected(coord, target_);
 
-    return connected ? behavior::ExecuteResult::Success
-      : behavior::ExecuteResult::Failure;
+    return connected ? behavior::ExecuteResult::Success : behavior::ExecuteResult::Failure;
   }
 
   marvin::MapCoord target_;
@@ -262,5 +266,4 @@ struct OnFrequencyNode : public behavior::BehaviorNode {
   int frequency;
 };
 
-
-}  // namespace marvin
+} // namespace marvin

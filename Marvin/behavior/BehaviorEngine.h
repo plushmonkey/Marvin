@@ -15,5 +15,5 @@ private:
   BehaviorNode* behavior_tree_;
 };
 
-}  // namespace behavior
-}  // namespace marvin
+} // namespace behavior
+} // namespace marvin

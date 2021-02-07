@@ -96,37 +96,28 @@ void ContinuumGameProxy::FetchPlayers() {
   for (std::size_t i = 0; i < count; ++i) {
     std::size_t player_addr = process_.ReadU32(players_addr + (i * 4));
 
-    if (!player_addr) continue;
+    if (!player_addr)
+      continue;
 
     Player player;
 
-    player.position.x =
-        process_.ReadU32(player_addr + kPosOffset) / 1000.0f / 16.0f;
-    player.position.y =
-        process_.ReadU32(player_addr + kPosOffset + 4) / 1000.0f / 16.0f;
+    player.position.x = process_.ReadU32(player_addr + kPosOffset) / 1000.0f / 16.0f;
+    player.position.y = process_.ReadU32(player_addr + kPosOffset + 4) / 1000.0f / 16.0f;
 
-    player.velocity.x =
-        process_.ReadI32(player_addr + kVelocityOffset) / 10.0f / 16.0f;
-    player.velocity.y =
-        process_.ReadI32(player_addr + kVelocityOffset + 4) / 10.0f / 16.0f;
+    player.velocity.x = process_.ReadI32(player_addr + kVelocityOffset) / 10.0f / 16.0f;
+    player.velocity.y = process_.ReadI32(player_addr + kVelocityOffset + 4) / 10.0f / 16.0f;
 
-    player.id =
-        static_cast<uint16_t>(process_.ReadU32(player_addr + kIdOffset));
-    player.discrete_rotation = static_cast<uint16_t>(
-        process_.ReadU32(player_addr + kRotOffset) / 1000);
+    player.id = static_cast<uint16_t>(process_.ReadU32(player_addr + kIdOffset));
+    player.discrete_rotation = static_cast<uint16_t>(process_.ReadU32(player_addr + kRotOffset) / 1000);
 
-    player.ship =
-        static_cast<uint8_t>(process_.ReadU32(player_addr + kShipOffset));
-    player.frequency =
-        static_cast<uint16_t>(process_.ReadU32(player_addr + kFreqOffset));
+    player.ship = static_cast<uint8_t>(process_.ReadU32(player_addr + kShipOffset));
+    player.frequency = static_cast<uint16_t>(process_.ReadU32(player_addr + kFreqOffset));
 
-    player.status =
-        static_cast<uint8_t>(process_.ReadU32(player_addr + kStatusOffset));
+    player.status = static_cast<uint8_t>(process_.ReadU32(player_addr + kStatusOffset));
 
     player.name = process_.ReadString(player_addr + kNameOffset, 23);
 
-    player.bounty = *(u32*)(player_addr + kBountyOffset1) +
-                    *(u32*)(player_addr + kBountyOffset2);
+    player.bounty = *(u32*)(player_addr + kBountyOffset1) + *(u32*)(player_addr + kBountyOffset2);
 
     if (player.id == player_id_) {
       // Energy calculation @4485FA
@@ -150,16 +141,11 @@ void ContinuumGameProxy::FetchPlayers() {
       player_ = &players_.back();
 
       // @448D37
-      ship_status_.rotation =
-          *(u32*)(player_addr + 0x278) + *(u32*)(player_addr + 0x274);
-      ship_status_.recharge =
-          *(u32*)(player_addr + 0x1E8) + *(u32*)(player_addr + 0x1EC);
-      ship_status_.shrapnel =
-          *(u32*)(player_addr + 0x2A8) + *(u32*)(player_addr + 0x2AC);
-      ship_status_.thrust =
-          *(u32*)(player_addr + 0x244) + *(u32*)(player_addr + 0x248);
-      ship_status_.speed =
-          *(u32*)(player_addr + 0x350) + *(u32*)(player_addr + 0x354);
+      ship_status_.rotation = *(u32*)(player_addr + 0x278) + *(u32*)(player_addr + 0x274);
+      ship_status_.recharge = *(u32*)(player_addr + 0x1E8) + *(u32*)(player_addr + 0x1EC);
+      ship_status_.shrapnel = *(u32*)(player_addr + 0x2A8) + *(u32*)(player_addr + 0x2AC);
+      ship_status_.thrust = *(u32*)(player_addr + 0x244) + *(u32*)(player_addr + 0x248);
+      ship_status_.speed = *(u32*)(player_addr + 0x350) + *(u32*)(player_addr + 0x354);
     }
   }
 }
@@ -179,7 +165,7 @@ std::vector<Weapon*> ContinuumGameProxy::GetWeapons() {
 }
 
 const ClientSettings& ContinuumGameProxy::GetSettings() const {
-  std::size_t addr = game_addr_ + 0x127EC + 0x1AE70;  // 0x2D65C
+  std::size_t addr = game_addr_ + 0x127EC + 0x1AE70; // 0x2D65C
 
   return *reinterpret_cast<ClientSettings*>(addr);
 }
@@ -195,8 +181,7 @@ const ShipSettings& ContinuumGameProxy::GetShipSettings(int ship) const {
 std::string ContinuumGameProxy::GetName() const {
   const std::size_t ProfileStructSize = 2860;
 
-  uint16_t profile_index =
-      process_.ReadU32(module_base_menu_ + 0x47FA0) & 0xFFFF;
+  uint16_t profile_index = process_.ReadU32(module_base_menu_ + 0x47FA0) & 0xFFFF;
   std::size_t addr = process_.ReadU32(module_base_menu_ + 0x47A38) + 0x15;
 
   if (addr == 0) {
@@ -212,7 +197,9 @@ std::string ContinuumGameProxy::GetName() const {
   return name;
 }
 
-int ContinuumGameProxy::GetEnergy() const { return player_->energy; }
+int ContinuumGameProxy::GetEnergy() const {
+  return player_->energy;
+}
 
 Vector2f ContinuumGameProxy::GetPosition() const {
   float x = (*position_data_) / 16.0f;
@@ -225,8 +212,12 @@ const std::vector<Player>& ContinuumGameProxy::GetPlayers() const {
   return players_;
 }
 
-const Map& ContinuumGameProxy::GetMap() const { return *map_; }
-const Player& ContinuumGameProxy::GetPlayer() const { return *player_; }
+const Map& ContinuumGameProxy::GetMap() const {
+  return *map_;
+}
+const Player& ContinuumGameProxy::GetPlayer() const {
+  return *player_;
+}
 
 const Player& ContinuumGameProxy::GetSelectedPlayer() const {
   u32 selected_index = *(u32*)(game_addr_ + 0x127EC + 0x1B758);
@@ -253,8 +244,7 @@ std::string ContinuumGameProxy::GetServerFolder() const {
 }
 
 std::string ContinuumGameProxy::GetMapName() const {
-  return process_.ReadString((*(u32*)(game_addr_ + 0x127ec + 0x6C4)) + 0x01,
-                             16);
+  return process_.ReadString((*(u32*)(game_addr_ + 0x127ec + 0x6C4)) + 0x01, 16);
 }
 
 bool ContinuumGameProxy::SetShip(int ship) {
@@ -271,7 +261,9 @@ bool ContinuumGameProxy::SetShip(int ship) {
   return menu_open;
 }
 
-void ContinuumGameProxy::Warp() { SendKey(VK_INSERT); }
+void ContinuumGameProxy::Warp() {
+  SendKey(VK_INSERT);
+}
 
 void ContinuumGameProxy::Cloak(KeyController& keys) {
   keys.Press(VK_SHIFT);
@@ -284,7 +276,9 @@ void ContinuumGameProxy::SetWindowFocus() {
   process_.WriteU32(focus_addr, 1);
 }
 
-ExeProcess& ContinuumGameProxy::GetProcess() { return process_; }
+ExeProcess& ContinuumGameProxy::GetProcess() {
+  return process_;
+}
 
 void ContinuumGameProxy::SendKey(int vKey) {
   SendMessage(hwnd_, WM_KEYDOWN, (WPARAM)vKey, 0);
@@ -292,11 +286,11 @@ void ContinuumGameProxy::SendKey(int vKey) {
 }
 
 void ContinuumGameProxy::SendChatMessage(const std::string& mesg) const {
-  typedef void(__fastcall * ChatSendFunction)(void* This,
-                                              void* thiscall_garbage, char* msg,
-                                              u32* unknown1, u32* unknown2);
+  typedef void(__fastcall * ChatSendFunction)(void* This, void* thiscall_garbage, char* msg, u32* unknown1,
+                                              u32* unknown2);
 
-  if (mesg.empty()) return;
+  if (mesg.empty())
+    return;
 
   // The address to the current text input buffer
   std::size_t chat_input_addr = game_addr_ + 0x2DD14;
@@ -305,8 +299,7 @@ void ContinuumGameProxy::SendChatMessage(const std::string& mesg) const {
   memcpy(input, mesg.c_str(), mesg.length());
   input[mesg.length()] = 0;
 
-  ChatSendFunction send_func =
-      (ChatSendFunction)(*(u32*)(module_base_continuum_ + 0xAC30C));
+  ChatSendFunction send_func = (ChatSendFunction)(*(u32*)(module_base_continuum_ + 0xAC30C));
   void* This = (void*)(game_addr_ + 0x2DBF0);
 
   // Some value that the client passes in for some reason
@@ -318,4 +311,4 @@ void ContinuumGameProxy::SendChatMessage(const std::string& mesg) const {
   input[0] = 0;
 }
 
-}  // namespace marvin
+} // namespace marvin

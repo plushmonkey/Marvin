@@ -19,7 +19,7 @@ struct NodeConnections {
 
 // Determines the node edges when using A*.
 class NodeProcessor {
- public:
+public:
   NodeProcessor(const Map& map) : map_(map) {
     nodes_.resize(kMaxNodes);
   }
@@ -29,10 +29,10 @@ class NodeProcessor {
   NodeConnections FindEdges(Node* node, Node* start, Node* goal, float radius);
   Node* GetNode(NodePoint point);
 
- private:
+private:
   std::vector<Node> nodes_;
   const Map& map_;
 };
 
-}  // namespace path
-}  // namespace marvin
+} // namespace path
+} // namespace marvin

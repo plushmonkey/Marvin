@@ -11,7 +11,8 @@ ExecuteResult FollowPathNode::Execute(ExecuteContext& ctx) {
   auto path = ctx.blackboard.ValueOr(path_name_, std::vector<Vector2f>());
   size_t path_size = path.size();
 
-  if (path.empty()) return ExecuteResult::Failure;
+  if (path.empty())
+    return ExecuteResult::Failure;
 
   auto& game = ctx.bot->GetGame();
   Vector2f current = path.front();
@@ -27,8 +28,7 @@ ExecuteResult FollowPathNode::Execute(ExecuteContext& ctx) {
     }
   }
 
-  while (path.size() > 1 &&
-         CanMoveBetween(game, from, path.at(1))) {
+  while (path.size() > 1 && CanMoveBetween(game, from, path.at(1))) {
     path.erase(path.begin());
     current = path.front();
   }
@@ -41,14 +41,13 @@ ExecuteResult FollowPathNode::Execute(ExecuteContext& ctx) {
     ctx.blackboard.Set(path_name_, path);
   }
 
-  //ctx.bot->GetSteering().Arrive(current, 0.3f);
+  // ctx.bot->GetSteering().Arrive(current, 0.3f);
   ctx.bot->Move(current, 0.0f);
 
   return ExecuteResult::Success;
 }
 
-bool FollowPathNode::CanMoveBetween(GameProxy& game, Vector2f from,
-                                    Vector2f to) {
+bool FollowPathNode::CanMoveBetween(GameProxy& game, Vector2f from, Vector2f to) {
   Vector2f trajectory = to - from;
   Vector2f direction = Normalize(trajectory);
   Vector2f side = Perpendicular(direction);
@@ -57,13 +56,11 @@ bool FollowPathNode::CanMoveBetween(GameProxy& game, Vector2f from,
   float radius = game.GetShipSettings().GetRadius();
 
   CastResult center = RayCast(game.GetMap(), from, direction, distance);
-  CastResult side1 =
-      RayCast(game.GetMap(), from + side * radius, direction, distance);
-  CastResult side2 =
-      RayCast(game.GetMap(), from - side * radius, direction, distance);
+  CastResult side1 = RayCast(game.GetMap(), from + side * radius, direction, distance);
+  CastResult side2 = RayCast(game.GetMap(), from - side * radius, direction, distance);
 
   return !center.hit && !side1.hit && !side2.hit;
 }
 
-}  // namespace behavior
-}  // namespace marvin
+} // namespace behavior
+} // namespace marvin

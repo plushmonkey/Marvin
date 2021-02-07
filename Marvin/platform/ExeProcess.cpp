@@ -26,8 +26,7 @@ bool ExeProcess::WriteU32(std::size_t address, uint32_t value) {
   return true;
 }
 
-std::string ExeProcess::ReadString(std::size_t address,
-                                   std::size_t length) const {
+std::string ExeProcess::ReadString(std::size_t address, std::size_t length) const {
   std::string value;
   char* data = (char*)address;
 
@@ -45,8 +44,7 @@ std::string ExeProcess::ReadString(std::size_t address,
 }
 
 std::size_t ExeProcess::GetModuleBase(const char* module_name) {
-  HANDLE hSnapshot = CreateToolhelp32Snapshot(
-      TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, process_id_);
+  HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, process_id_);
   MODULEENTRY32 me = {0};
 
   me.dwSize = sizeof(me);
@@ -70,8 +68,12 @@ std::size_t ExeProcess::GetModuleBase(const char* module_name) {
   return module_base;
 }
 
-HANDLE ExeProcess::GetHandle() { return process_handle_; }
+HANDLE ExeProcess::GetHandle() {
+  return process_handle_;
+}
 
-DWORD ExeProcess::GetId() { return process_id_; }
+DWORD ExeProcess::GetId() {
+  return process_id_;
+}
 
-}  // namespace marvin
+} // namespace marvin

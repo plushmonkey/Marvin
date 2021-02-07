@@ -30,18 +30,10 @@ struct Node {
   bool closed;
   bool openset;
 
-  Node()
-      : closed(false),
-        openset(false),
-        parent(nullptr),
-        g(0),
-        h(0),
-        f(0),
-        weight(1),
-        rotations(0) {}
+  Node() : closed(false), openset(false), parent(nullptr), g(0), h(0), f(0), weight(1), rotations(0) {}
 };
 
-}  // namespace path
-}  // namespace marvin
+} // namespace path
+} // namespace marvin
 
 MAKE_HASHABLE(marvin::path::NodePoint, t.x, t.y);

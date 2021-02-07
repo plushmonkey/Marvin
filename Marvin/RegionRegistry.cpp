@@ -6,9 +6,9 @@
 
 namespace marvin {
 
-void FloodFillEmptyRegion(const Map& map, const MapCoord& coord,
-                          RegionRegistry& registry, RegionIndex region_index) {
-  if (map.IsSolid(coord.x, coord.y)) return;
+void FloodFillEmptyRegion(const Map& map, const MapCoord& coord, RegionRegistry& registry, RegionIndex region_index) {
+  if (map.IsSolid(coord.x, coord.y))
+    return;
 
   registry.Insert(coord, region_index);
 
@@ -90,7 +90,9 @@ void RegionRegistry::Insert(MapCoord coord, RegionIndex index) {
   coord_regions_[coord] = index;
 }
 
-RegionIndex RegionRegistry::CreateRegion() { return region_count_++; }
+RegionIndex RegionRegistry::CreateRegion() {
+  return region_count_++;
+}
 
 bool RegionRegistry::IsConnected(MapCoord a, MapCoord b) const {
   auto first = coord_regions_.find(a);
@@ -98,9 +100,10 @@ bool RegionRegistry::IsConnected(MapCoord a, MapCoord b) const {
 
   // Only one needs to be checked for invalid because the second line will
   // fail if one only one is invalid
-  if (first == coord_regions_.end()) return false;
+  if (first == coord_regions_.end())
+    return false;
 
   return first->second == second->second;
 }
 
-}  // namespace marvin
+} // namespace marvin

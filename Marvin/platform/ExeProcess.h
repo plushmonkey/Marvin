@@ -10,7 +10,7 @@
 namespace marvin {
 
 class ExeProcess {
- public:
+public:
   ExeProcess();
   ~ExeProcess();
 
@@ -28,9 +28,9 @@ class ExeProcess {
   HANDLE GetHandle();
   DWORD GetId();
 
- private:
+private:
   HANDLE process_handle_;
   DWORD process_id_;
 };
 
-}  // namespace marvin
+} // namespace marvin

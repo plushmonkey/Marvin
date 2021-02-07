@@ -24,4 +24,4 @@ void WaitForSync();
 
 Vector2f GetWindowCenter();
 
-}  // namespace marvin
+} // namespace marvin

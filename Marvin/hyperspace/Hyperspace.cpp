@@ -19,7 +19,8 @@ const Vector2f kTunnelWarp(390, 395);
 #endif
 
 float GetPathDistance(std::vector<Vector2f> path) {
-  if (path.size() <= 1) return 0.0f;
+  if (path.size() <= 1)
+    return 0.0f;
 
   float distance = 0.0f;
 
@@ -44,13 +45,11 @@ struct MoveToNode : public PathingNode {
       return behavior::ExecuteResult::Success;
     }
 
-    if (!ctx.bot->GetRegions().IsConnected(MapCoord(game.GetPosition()),
-                                           MapCoord(target_))) {
+    if (!ctx.bot->GetRegions().IsConnected(MapCoord(game.GetPosition()), MapCoord(target_))) {
       return behavior::ExecuteResult::Failure;
     }
 
-    Path path = CreatePath(ctx, "nav_path", position, target_,
-                           game.GetShipSettings().GetRadius());
+    Path path = CreatePath(ctx, "nav_path", position, target_, game.GetShipSettings().GetRadius());
     ctx.blackboard.Set("nav_path", path);
 
     if (follow_node_.Execute(ctx) == behavior::ExecuteResult::Failure) {
@@ -65,22 +64,20 @@ struct MoveToNode : public PathingNode {
 };
 
 struct BaseDefenseBehavior : public PathingNode {
- public:
+public:
   BaseDefenseBehavior() : follow_node_("path") {}
 
   behavior::ExecuteResult Execute(behavior::ExecuteContext& ctx) override {
     const float kEnemyNearDistance = 40.0f;
 
     auto& game = ctx.bot->GetGame();
-    auto target =
-        ctx.blackboard.ValueOr<const Player*>("target_player", nullptr);
+    auto target = ctx.blackboard.ValueOr<const Player*>("target_player", nullptr);
 
     // Create the base path from entrance to flag room.
     if (base_path_.empty()) {
       ctx.blackboard.Erase("base_path");
 
-      base_path_ = this->CreatePath(ctx, "base_path", kBaseEntrance, kFlagRoom,
-                                    game.GetShipSettings().GetRadius());
+      base_path_ = this->CreatePath(ctx, "base_path", kBaseEntrance, kFlagRoom, game.GetShipSettings().GetRadius());
       ctx.blackboard.Set("base_path", base_path_);
 
 #if 0
@@ -94,16 +91,14 @@ struct BaseDefenseBehavior : public PathingNode {
     if (target != nullptr) {
       // Construct a path to the enemy to see how far away they are
       ctx.blackboard.Erase("target_path");
-      Path target_path = this->CreatePath(
-          ctx, "target_path", base_path_[current_index_], target->position,
-          game.GetShipSettings(target->ship).GetRadius());
+      Path target_path = this->CreatePath(ctx, "target_path", base_path_[current_index_], target->position,
+                                          game.GetShipSettings(target->ship).GetRadius());
       float path_distance = GetPathDistance(target_path);
 
       if (path_distance < kEnemyNearDistance) {
         // Enemy is near bot, so move back to next node
         current_index_++;
-      } else if (current_index_ > 0 &&
-                 path_distance > kEnemyNearDistance * 1.2f) {
+      } else if (current_index_ > 0 && path_distance > kEnemyNearDistance * 1.2f) {
         // Enemy is far away from bot, so move up
         --current_index_;
       }
@@ -136,8 +131,7 @@ struct BaseDefenseBehavior : public PathingNode {
 
     // Construct a micro-level path to the current node from the larger base
     // nodes.
-    Path micro_path = this->CreatePath(ctx, "path", game.GetPosition(),
-                                       base_path_[current_index_],
+    Path micro_path = this->CreatePath(ctx, "path", game.GetPosition(), base_path_[current_index_],
                                        game.GetShipSettings().GetRadius());
 
     ctx.blackboard.Set("path", micro_path);
@@ -149,7 +143,7 @@ struct BaseDefenseBehavior : public PathingNode {
     return behavior::ExecuteResult::Success;
   }
 
- private:
+private:
   std::size_t current_index_ = 0;
   Path base_path_;
   behavior::FollowPathNode follow_node_;
@@ -165,22 +159,18 @@ struct HyperspaceFlagger : public behavior::SelectorNode {
     auto in_tunnel_node = std::make_unique<InRegionNode>(Vector2f(30, 30));
     auto in_sector_node = std::make_unique<InRegionNode>(kFlagRoom);
 
-    auto move_to_tunnel = std::make_unique<behavior::SequenceNode>(
-        in_center_node.get(), warp_to_tunnel_node.get());
-    auto move_to_sector = std::make_unique<behavior::SequenceNode>(
-        in_tunnel_node.get(), warp_to_sector_node.get());
+    auto move_to_tunnel = std::make_unique<behavior::SequenceNode>(in_center_node.get(), warp_to_tunnel_node.get());
+    auto move_to_sector = std::make_unique<behavior::SequenceNode>(in_tunnel_node.get(), warp_to_sector_node.get());
 
     auto find_enemy = std::make_unique<FindEnemyNode>();
-    auto success_find_enemy =
-        std::make_unique<behavior::SuccessNode>(find_enemy.get());
+    auto success_find_enemy = std::make_unique<behavior::SuccessNode>(find_enemy.get());
 
     auto defense = std::make_unique<BaseDefenseBehavior>();
 
-    auto defend_sequence = std::make_unique<behavior::SequenceNode>(
-        success_find_enemy.get(), defense.get());
+    auto defend_sequence = std::make_unique<behavior::SequenceNode>(success_find_enemy.get(), defense.get());
 
-    auto selector = std::make_unique<behavior::SelectorNode>(
-        move_to_tunnel.get(), move_to_sector.get(), defend_sequence.get());
+    auto selector =
+        std::make_unique<behavior::SelectorNode>(move_to_tunnel.get(), move_to_sector.get(), defend_sequence.get());
 
     bot.SetBehavior(selector.get());
 
@@ -212,5 +202,5 @@ bool SetHyperspaceBehavior(Bot& bot) {
   return true;
 }
 
-}  // namespace hs
-}  // namespace marvin
+} // namespace hs
+} // namespace marvin

@@ -15,7 +15,8 @@ float BoxPointDistance(Vector2f box_pos, Vector2f box_extent, Vector2f p) {
   return std::sqrt(dx * dx + dy * dy);
 }
 
-bool LineBoxIntersect(Vector2f point, Vector2f direction, Vector2f box_pos, Vector2f box_extent, float* dist, Vector2f* norm) {
+bool LineBoxIntersect(Vector2f point, Vector2f direction, Vector2f box_pos, Vector2f box_extent, float* dist,
+                      Vector2f* norm) {
   if (RayBoxIntersect(point, direction, box_pos, box_extent, dist, norm)) {
     return true;
   }
@@ -23,7 +24,8 @@ bool LineBoxIntersect(Vector2f point, Vector2f direction, Vector2f box_pos, Vect
   return RayBoxIntersect(point, -direction, box_pos, box_extent, dist, norm);
 }
 
-bool RayBoxIntersect(Vector2f origin, Vector2f direction, Vector2f box_pos, Vector2f box_extent, float* dist, Vector2f* norm) {
+bool RayBoxIntersect(Vector2f origin, Vector2f direction, Vector2f box_pos, Vector2f box_extent, float* dist,
+                     Vector2f* norm) {
   Vector2f recip(1.0f / direction.x, 1.0f / direction.y);
   Vector2f lb = box_pos + Vector2f(0, box_extent.y);
   Vector2f rt = box_pos + Vector2f(box_extent.x, 0);
@@ -33,8 +35,8 @@ bool RayBoxIntersect(Vector2f origin, Vector2f direction, Vector2f box_pos, Vect
   float t3 = (float)((lb.y - origin.y) * recip.y);
   float t4 = (float)((rt.y - origin.y) * recip.y);
 
-  using std::min;
   using std::max;
+  using std::min;
 
   float tmin = max(min(t1, t2), min(t3, t4));
   float tmax = min(max(t1, t2), max(t3, t4));
@@ -73,9 +75,10 @@ bool RayBoxIntersect(Vector2f origin, Vector2f direction, Vector2f box_pos, Vect
 }
 
 CastResult RayCast(const Map& map, Vector2f from, Vector2f direction, float max_length) {
-  static const Vector2f kDirections[] = { Vector2f(0, 0), Vector2f(1, 0), Vector2f(-1, 0), Vector2f(0, 1), Vector2f(0, -1) };
+  static const Vector2f kDirections[] = {Vector2f(0, 0), Vector2f(1, 0), Vector2f(-1, 0), Vector2f(0, 1),
+                                         Vector2f(0, -1)};
 
-  CastResult result = { 0 };
+  CastResult result = {0};
   float closest_distance = std::numeric_limits<float>::max();
   Vector2f closest_normal;
 
@@ -89,7 +92,8 @@ CastResult RayCast(const Map& map, Vector2f from, Vector2f direction, float max_
     for (Vector2f check_direction : kDirections) {
       Vector2f check = current + check_direction;
 
-      if (!map.IsSolid((unsigned short)check.x, (unsigned short)check.y)) continue;
+      if (!map.IsSolid((unsigned short)check.x, (unsigned short)check.y))
+        continue;
 
       float dist;
       Vector2f normal;
@@ -113,4 +117,4 @@ CastResult RayCast(const Map& map, Vector2f from, Vector2f direction, float max_
   return result;
 }
 
-}
+} // namespace marvin

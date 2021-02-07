@@ -7,5 +7,5 @@ namespace hs {
 
 bool SetHyperspaceBehavior(Bot& bot);
 
-}  // namespace hs
-}  // namespace marvin
+} // namespace hs
+} // namespace marvin

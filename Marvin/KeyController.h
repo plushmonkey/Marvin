@@ -6,7 +6,7 @@ using KeyId = int;
 constexpr KeyId kKeyCount = 256;
 
 class KeyController {
- public:
+public:
   KeyController();
 
   void Set(KeyId key, bool down);
@@ -16,8 +16,8 @@ class KeyController {
 
   bool IsPressed(KeyId key);
 
- private:
+private:
   bool keys_[kKeyCount];
 };
 
-}  // namespace marvin
+} // namespace marvin

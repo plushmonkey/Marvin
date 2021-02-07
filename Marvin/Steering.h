@@ -8,7 +8,7 @@ class Bot;
 struct Player;
 
 class SteeringBehavior {
- public:
+public:
   SteeringBehavior(Bot* bot);
 
   Vector2f GetSteering();
@@ -23,10 +23,10 @@ class SteeringBehavior {
   void Face(Vector2f target);
   void AvoidWalls();
 
- private:
+private:
   Bot* bot_;
   Vector2f force_;
   float rotation_;
 };
 
-}  // namespace marvin
+} // namespace marvin

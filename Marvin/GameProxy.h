@@ -14,7 +14,7 @@ namespace marvin {
 class Map;
 
 class Weapon {
- public:
+public:
   virtual u16 GetPlayerId() const = 0;
   virtual Vector2f GetPosition() const = 0;
   virtual Vector2f GetVelocity() const = 0;
@@ -30,7 +30,7 @@ struct ShipStatus {
 };
 
 class GameProxy {
- public:
+public:
   virtual ~GameProxy() {}
 
   virtual void Update(float dt) = 0;
@@ -60,4 +60,4 @@ class GameProxy {
   virtual void SendChatMessage(const std::string& mesg) const = 0;
 };
 
-}  // namespace marvin
+} // namespace marvin

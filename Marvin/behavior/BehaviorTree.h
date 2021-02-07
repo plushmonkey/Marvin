@@ -24,50 +24,44 @@ struct ExecuteContext {
 };
 
 class BehaviorNode {
- public:
+public:
   virtual ExecuteResult Execute(ExecuteContext& ctx) = 0;
 };
 
 class SequenceNode : public BehaviorNode {
- public:
+public:
   SequenceNode(std::vector<BehaviorNode*> children);
   template <typename... Args>
-  SequenceNode(Args... children)
-      : SequenceNode(
-            std::vector<BehaviorNode*>({std::forward<Args>(children)...})) {}
+  SequenceNode(Args... children) : SequenceNode(std::vector<BehaviorNode*>({std::forward<Args>(children)...})) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override;
 
- private:
+private:
   std::vector<BehaviorNode*> children_;
   std::size_t running_node_index_;
 };
 
 class ParallelNode : public BehaviorNode {
- public:
+public:
   ParallelNode(std::vector<BehaviorNode*> children);
   template <typename... Args>
-  ParallelNode(Args... children)
-      : ParallelNode(
-            std::vector<BehaviorNode*>({std::forward<Args>(children)...})) {}
+  ParallelNode(Args... children) : ParallelNode(std::vector<BehaviorNode*>({std::forward<Args>(children)...})) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override;
 
- private:
+private:
   std::vector<BehaviorNode*> children_;
 };
 
 class SelectorNode : public BehaviorNode {
- public:
+public:
   SelectorNode(std::vector<BehaviorNode*> children);
   template <typename... Args>
-  SelectorNode(Args... children)
-      : SelectorNode(
-            std::vector<BehaviorNode*>({std::forward<Args>(children)...})) {}
+  SelectorNode(Args... children) : SelectorNode(std::vector<BehaviorNode*>({std::forward<Args>(children)...})) {}
 
   ExecuteResult Execute(ExecuteContext& ctx) override;
 
- protected:
+protected:
   std::vector<BehaviorNode*> children_;
 };
 
@@ -76,6 +70,7 @@ public:
   SuccessNode(BehaviorNode* child);
 
   ExecuteResult Execute(ExecuteContext& ctx) override;
+
 protected:
   BehaviorNode* child_;
 };
@@ -85,9 +80,10 @@ public:
   InvertNode(BehaviorNode* child);
 
   ExecuteResult Execute(ExecuteContext& ctx) override;
+
 protected:
   BehaviorNode* child_;
 };
 
-}  // namespace behavior
-}  // namespace marvin
+} // namespace behavior
+} // namespace marvin
