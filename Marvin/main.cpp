@@ -68,14 +68,15 @@ BOOL WINAPI OverridePeekMessageA(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin, UIN
   seconds dt = now - g_LastUpdateTime;
 
   if (g_Enabled) {
-    g_Bot->Update(dt.count());
-  }
-
-  g_LastUpdateTime = now;
+    if (dt.count() >= 1.0f / 60.0f) {
+      g_Bot->Update(dt.count());
+      g_LastUpdateTime = now;
 
 #if DEBUG_RENDER
-  marvin::WaitForSync();
+      marvin::WaitForSync();
 #endif
+    }
+  }
 
   return RealPeekMessageA(lpMsg, hWnd, wMsgFilterMin, wMsgFilterMax, wRemoveMsg);
 }

@@ -282,7 +282,7 @@ void Pathfinder::CreateMapWeights(const Map& map) {
         distance = 1;
 
       if (distance < close_distance) {
-        node->weight = 50.0f / distance;
+        node->weight = 12.0f / distance;
       }
     }
   }

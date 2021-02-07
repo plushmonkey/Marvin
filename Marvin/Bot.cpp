@@ -579,6 +579,10 @@ void RenderPath(GameProxy& game, behavior::Blackboard& blackboard) {
   std::vector<Vector2f> path = blackboard.ValueOr("path", std::vector<Vector2f>());
   const Player& player = game.GetPlayer();
 
+  if (path.empty()) {
+    return;
+  }
+
   for (std::size_t i = 0; i < path.size() - 1; ++i) {
     Vector2f current = path[i];
     Vector2f next = path[i + 1];
