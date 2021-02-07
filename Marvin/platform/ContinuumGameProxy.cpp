@@ -4,8 +4,8 @@
 #include <vector>
 
 #include "../Bot.h"
-#include "../Map.h"
 #include "../Debug.h"
+#include "../Map.h"
 
 namespace marvin {
 
@@ -19,8 +19,8 @@ ContinuumGameProxy::ContinuumGameProxy(HWND hwnd) {
 
   position_data_ = (uint32_t*)(game_addr_ + 0x126BC);
 
-  // TODO: Either find this from memory or pass it in through config
-  std::string path = GetServerFolder() + "\\jun2018.lvl";
+  map_name_ = GetMapName();
+  std::string path = GetServerFolder() + "\\" + map_name_;
 
   map_ = Map::Load(path);
 
@@ -38,6 +38,17 @@ void ContinuumGameProxy::Update(float dt) {
   // Continuum stops processing input when it loses focus, so update the memory
   // to make it think it always has focus.
   SetWindowFocus();
+
+  // Keep loaded map synchronized with the current arena map
+  std::string new_map_name = GetMapName();
+  if (new_map_name != this->map_name_) {
+    std::string path = GetServerFolder() + "\\" + new_map_name;
+
+    debug_log << "Loading new map " << path << std::endl;
+
+    map_ = Map::Load(path);
+    map_name_ = new_map_name;
+  }
 
   FetchPlayers();
 
@@ -139,12 +150,17 @@ void ContinuumGameProxy::FetchPlayers() {
       player_ = &players_.back();
 
       // @448D37
-      ship_status_.rotation = *(u32*)(player_addr + 0x278) + *(u32*)(player_addr + 0x274);
-      ship_status_.recharge = *(u32*)(player_addr + 0x1E8) + *(u32*)(player_addr + 0x1EC);
-      ship_status_.shrapnel = *(u32*)(player_addr + 0x2A8) + *(u32*)(player_addr + 0x2AC);
-      ship_status_.thrust = *(u32*)(player_addr + 0x244) + *(u32*)(player_addr + 0x248);
-      ship_status_.speed = *(u32*)(player_addr + 0x350) + *(u32*)(player_addr + 0x354);
-    } 
+      ship_status_.rotation =
+          *(u32*)(player_addr + 0x278) + *(u32*)(player_addr + 0x274);
+      ship_status_.recharge =
+          *(u32*)(player_addr + 0x1E8) + *(u32*)(player_addr + 0x1EC);
+      ship_status_.shrapnel =
+          *(u32*)(player_addr + 0x2A8) + *(u32*)(player_addr + 0x2AC);
+      ship_status_.thrust =
+          *(u32*)(player_addr + 0x244) + *(u32*)(player_addr + 0x248);
+      ship_status_.speed =
+          *(u32*)(player_addr + 0x350) + *(u32*)(player_addr + 0x354);
+    }
   }
 }
 
@@ -228,12 +244,17 @@ const Player* ContinuumGameProxy::GetPlayerById(u16 id) const {
   return nullptr;
 }
 
-// TODO: Find level data or level name in memory
+// TODO: Find level data in memory
 std::string ContinuumGameProxy::GetServerFolder() const {
   std::size_t folder_addr = *(uint32_t*)(game_addr_ + 0x127ec + 0x5a3c) + 0x10D;
   std::string server_folder = process_.ReadString(folder_addr, 256);
 
   return server_folder;
+}
+
+std::string ContinuumGameProxy::GetMapName() const {
+  return process_.ReadString((*(u32*)(game_addr_ + 0x127ec + 0x6C4)) + 0x01,
+                             16);
 }
 
 bool ContinuumGameProxy::SetShip(int ship) {

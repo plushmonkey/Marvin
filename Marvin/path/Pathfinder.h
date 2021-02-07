@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 
+#include "../RegionRegistry.h"
 #include "../Vector2f.h"
 #include "NodeProcessor.h"
 #include "Path.h"
@@ -46,8 +47,10 @@ class PriorityQueue {
 
 struct Pathfinder {
  public:
-  Pathfinder(std::unique_ptr<NodeProcessor> processor);
-  std::vector<Vector2f> FindPath(const Vector2f& from, const Vector2f& to, float radius);
+  Pathfinder(std::unique_ptr<NodeProcessor> processor,
+             RegionRegistry& regions);
+  std::vector<Vector2f> FindPath(const Vector2f& from, const Vector2f& to,
+                                 float radius);
 
   std::vector<Vector2f> SmoothPath(const std::vector<Vector2f>& path,
                                    const Map& map, float ship_radius);
@@ -63,6 +66,7 @@ struct Pathfinder {
   };
 
   std::unique_ptr<NodeProcessor> processor_;
+  RegionRegistry& regions_;
   PriorityQueue<Node*, NodeCompare> openset_;
 };
 

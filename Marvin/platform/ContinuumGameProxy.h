@@ -65,6 +65,7 @@ class ContinuumGameProxy : public GameProxy {
   const ShipSettings& GetShipSettings(int ship) const override;
   const ShipStatus& GetShipStatus() const override;
   std::string GetServerFolder() const;
+  std::string GetMapName() const;
   const Map& GetMap() const override;
 
   const Player& GetPlayer() const override;
@@ -95,6 +96,7 @@ class ContinuumGameProxy : public GameProxy {
   uint32_t* position_data_;
   uint16_t player_id_;
   std::unique_ptr<Map> map_;
+  std::string map_name_;
   Player* player_;
   std::vector<Player> players_;
   std::vector<ContinuumWeapon> weapons_;

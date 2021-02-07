@@ -3,8 +3,8 @@
 #include <algorithm>
 #include <cmath>
 
-#include "../RayCaster.h"
 #include "../Bot.h"
+#include "../RayCaster.h"
 
 namespace marvin {
 namespace path {
@@ -30,7 +30,7 @@ Vector2f ClosestWall(const Map& map, Vector2f pos, int search) {
       }
     }
   }
-  
+
   return closest;
 }
 
@@ -62,8 +62,9 @@ float Euclidean(const Node* from, const Node* to) {
   return std::sqrt(dx * dx + dy * dy);
 }
 
-Pathfinder::Pathfinder(std::unique_ptr<NodeProcessor> processor)
-    : processor_(std::move(processor)) {}
+Pathfinder::Pathfinder(std::unique_ptr<NodeProcessor> processor,
+                       RegionRegistry& regions)
+    : processor_(std::move(processor)), regions_(regions) {}
 
 std::vector<Vector2f> Pathfinder::FindPath(const Vector2f& from,
                                            const Vector2f& to, float radius) {
@@ -75,6 +76,11 @@ std::vector<Vector2f> Pathfinder::FindPath(const Vector2f& from,
   Node* goal = processor_->GetNode(ToNodePoint(to));
 
   if (start == nullptr || goal == nullptr) {
+    return path;
+  }
+
+  if (!regions_.IsConnected(MapCoord(start->point.x, start->point.y),
+                            MapCoord(goal->point.x, goal->point.y))) {
     return path;
   }
 
@@ -90,7 +96,8 @@ std::vector<Vector2f> Pathfinder::FindPath(const Vector2f& from,
 
     node->closed = true;
 
-    NodeConnections connections = processor_->FindEdges(node, start, goal, radius);
+    NodeConnections connections =
+        processor_->FindEdges(node, start, goal, radius);
 
     for (std::size_t i = 0; i < connections.count; ++i) {
       Node* edge = connections.neighbors[i];
@@ -101,12 +108,15 @@ std::vector<Vector2f> Pathfinder::FindPath(const Vector2f& from,
 
       Node* parent = node->parent;
       if (parent) {
-        NodePoint parent_diff(parent->point.x - node->point.x, parent->point.y - node->point.y);
-        NodePoint current_diff(node->point.x - edge->point.x, node->point.y - edge->point.y);
+        NodePoint parent_diff(parent->point.x - node->point.x,
+                              parent->point.y - node->point.y);
+        NodePoint current_diff(node->point.x - edge->point.x,
+                               node->point.y - edge->point.y);
 
         edge->rotations = node->rotations;
 
-        if (parent_diff.x != current_diff.x || parent_diff.y != current_diff.y) {
+        if (parent_diff.x != current_diff.x ||
+            parent_diff.y != current_diff.y) {
           ++edge->rotations;
         }
       }
@@ -201,7 +211,7 @@ std::vector<Vector2f> Pathfinder::SmoothPath(const std::vector<Vector2f>& path,
     result[i] = new_pos;
   }
 
-#if 1 // Don't cull the path if this is enabled
+#if 1  // Don't cull the path if this is enabled
   return result;
 #endif
 
@@ -244,7 +254,7 @@ std::vector<Vector2f> Pathfinder::SmoothPath(const std::vector<Vector2f>& path,
   return result;
 }
 
-float GetWallDistance(const Map & map, u16 x, u16 y, u16 radius) {
+float GetWallDistance(const Map& map, u16 x, u16 y, u16 radius) {
   float closest_sq = std::numeric_limits<float>::max();
 
   for (i16 offset_y = -radius; offset_y < radius; ++offset_y) {
@@ -265,12 +275,12 @@ float GetWallDistance(const Map & map, u16 x, u16 y, u16 radius) {
   return std::sqrt(closest_sq);
 }
 
-void Pathfinder::CreateMapWeights(const Map & map) {
+void Pathfinder::CreateMapWeights(const Map& map) {
   for (u16 y = 0; y < 1024; ++y) {
     for (u16 x = 0; x < 1024; ++x) {
       if (map.IsSolid(x, y)) continue;
 
-      Node * node = this->processor_->GetNode(NodePoint(x, y));
+      Node* node = this->processor_->GetNode(NodePoint(x, y));
 
       u16 close_distance = 8;
 
@@ -284,7 +294,6 @@ void Pathfinder::CreateMapWeights(const Map & map) {
     }
   }
 }
-
 
 }  // namespace path
 }  // namespace marvin

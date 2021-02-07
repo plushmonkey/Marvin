@@ -522,8 +522,6 @@ Bot::Bot(std::unique_ptr<GameProxy> game)
     ship_ = 0;
   }
 
-  pathfinder_ = std::make_unique<path::Pathfinder>(std::move(processor));
-
   auto find_enemy = std::make_unique<FindEnemyNode>();
   auto looking_at_enemy = std::make_unique<LookingAtEnemyNode>();
   auto target_in_los = std::make_unique<InLineOfSightNode>(
@@ -609,6 +607,7 @@ Bot::Bot(std::unique_ptr<GameProxy> game)
       std::make_unique<behavior::BehaviorEngine>(behavior_nodes_.back().get());
 
   regions_ = RegionRegistry::Create(game_->GetMap());
+  pathfinder_ = std::make_unique<path::Pathfinder>(std::move(processor), *regions_);
   pathfinder_->CreateMapWeights(game_->GetMap());
 
   behavior_ctx_.blackboard.Set(
