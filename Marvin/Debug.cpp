@@ -22,6 +22,16 @@ void RenderLine(Vector2f from, Vector2f to, COLORREF color) {
   ReleaseDC(g_hWnd, hdc);
 }
 
+void RenderWorldLine(Vector2f screenCenterWorldPosition, Vector2f from, Vector2f to, COLORREF color) {
+  Vector2f center = GetWindowCenter();
+
+  Vector2f diff = to - from;
+  from = (from - screenCenterWorldPosition) * 16.0f;
+  to = from + (diff * 16.0f);
+
+  RenderLine(center + from, center + to, color);
+}
+
 void RenderText(const char* text, Vector2f at, COLORREF color, int flags) {
   HDC hdc = GetDC(g_hWnd);
 
@@ -46,9 +56,8 @@ void WaitForSync() {
 #else
 
 void RenderLine(Vector2f from, Vector2f to, COLORREF color) {}
-
+void RenderWorldLine(Vector2f screenCenterWorldPosition, Vector2f from, Vector2f to, COLORREF color) {}
 void RenderText(const char* text, Vector2f at, COLORREF color, int flags) {}
-
 void WaitForSync() {}
 #endif
 

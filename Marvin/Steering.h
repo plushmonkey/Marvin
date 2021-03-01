@@ -21,7 +21,7 @@ public:
   void Arrive(Vector2f target, float deceleration);
   void Pursue(const Player& enemy);
   void Face(Vector2f target);
-  void AvoidWalls();
+  void AvoidWalls(float max_look_ahead);
 
 private:
   Bot* bot_;

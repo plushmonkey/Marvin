@@ -19,6 +19,7 @@ enum RenderTextFlags {
 };
 
 void RenderLine(Vector2f from, Vector2f to, COLORREF color);
+void RenderWorldLine(Vector2f screenCenterWorldPosition, Vector2f from, Vector2f to, COLORREF color);
 void RenderText(const char* text, Vector2f at, COLORREF color, int flags = 0);
 void WaitForSync();
 

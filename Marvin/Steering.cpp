@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "Bot.h"
+#include "Debug.h"
 #include "Player.h"
 
 namespace marvin {
@@ -95,8 +96,54 @@ void SteeringBehavior::Face(Vector2f target) {
   rotation_ += WrapToPi(rotation);
 }
 
-void SteeringBehavior::AvoidWalls() {
+void SteeringBehavior::AvoidWalls(float max_look_ahead) {
+  constexpr float kDegToRad = 3.14159f / 180.0f;
+  constexpr size_t kFeelerCount = 29;
+
+  static_assert(kFeelerCount & 1, "Feeler count must be odd");
+
   auto& game = bot_->GetGame();
+  Vector2f feelers[kFeelerCount];
+
+  feelers[0] = Normalize(game.GetPlayer().velocity);
+
+  for (size_t i = 1; i < kFeelerCount; i += 2) {
+    feelers[i] = Rotate(feelers[0], kDegToRad * (90.0f / kFeelerCount) * i);
+    feelers[i + 1] = Rotate(feelers[0], -kDegToRad * (90.0f / kFeelerCount) * i);
+  }
+
+  float speed = game.GetPlayer().velocity.Length();
+  float max_speed = GetMaxSpeed(*bot_);
+  float look_ahead = max_look_ahead * (speed / max_speed);
+
+  size_t force_count = 0;
+  Vector2f force;
+
+  for (size_t i = 0; i < kFeelerCount; ++i) {
+    float intensity = feelers[i].Dot(Normalize(game.GetPlayer().velocity));
+    float check_distance = look_ahead * intensity;
+    Vector2f check = feelers[i] * intensity;
+    CastResult result = RayCast(game.GetMap(), game.GetPlayer().position, Normalize(feelers[i]), check_distance);
+    COLORREF color = RGB(100, 0, 0);
+
+    if (result.hit) {
+      float multiplier = ((check_distance - result.distance) / check_distance) * 1.5f;
+
+      force += Normalize(feelers[i]) * -Normalize(feelers[i]).Dot(feelers[0]) * multiplier * max_speed;
+
+      ++force_count;
+    } else {
+      result.distance = check_distance;
+      color = RGB(0, 100, 0);
+    }
+
+    RenderWorldLine(game.GetPosition(), game.GetPosition(),
+                    game.GetPosition() + Normalize(feelers[i]) * result.distance, color);
+  }
+
+  if (force_count > 0) {
+    force_ += force * (1.0f / force_count);
+  }
 }
 
 } // namespace marvin

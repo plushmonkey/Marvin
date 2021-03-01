@@ -527,7 +527,8 @@ Bot::Bot(std::unique_ptr<GameProxy> game) : game_(std::move(game)), steering_(th
   auto handle_enemy = std::make_unique<behavior::SequenceNode>(find_enemy.get(), path_or_shoot_selector.get());
 
   auto root_selector =
-      std::make_unique<behavior::SelectorNode>(warp_to_center.get(), handle_enemy.get(), patrol_path_sequence.get());
+      std::make_unique<behavior::SelectorNode>(//warp_to_center.get(),
+        handle_enemy.get(), patrol_path_sequence.get());
 
   behavior_nodes_.push_back(std::move(in_spawn_region));
   behavior_nodes_.push_back(std::move(invert_in_region));
@@ -565,16 +566,6 @@ Bot::Bot(std::unique_ptr<GameProxy> game) : game_(std::move(game)), steering_(th
   behavior_ctx_.blackboard.Set("patrol_index", 0);
 }
 
-void RenderWorldLine(Vector2f screenCenterWorldPosition, Vector2f from, Vector2f to) {
-  Vector2f center = GetWindowCenter();
-
-  Vector2f diff = to - from;
-  from = (from - screenCenterWorldPosition) * 16.0f;
-  to = from + (diff * 16.0f);
-
-  RenderLine(center + from, center + to, RGB(200, 0, 0));
-}
-
 void RenderPath(GameProxy& game, behavior::Blackboard& blackboard) {
   std::vector<Vector2f> path = blackboard.ValueOr("path", std::vector<Vector2f>());
   const Player& player = game.GetPlayer();
@@ -588,10 +579,10 @@ void RenderPath(GameProxy& game, behavior::Blackboard& blackboard) {
     Vector2f next = path[i + 1];
 
     if (i == 0) {
-      RenderWorldLine(player.position, player.position, current);
+      RenderWorldLine(player.position, player.position, current, RGB(200, 0, 0));
     }
 
-    RenderWorldLine(player.position, current, next);
+    RenderWorldLine(player.position, current, next, RGB(200, 0, 0));
   }
 }
 
@@ -618,6 +609,16 @@ void Bot::Update(float dt) {
   behavior_ctx_.dt = dt;
 
   behavior_->Update(behavior_ctx_);
+
+#if 0 // Test wall avoidance. This should be moved somewhere in the behavior tree
+  std::vector<Vector2f> path = behavior_ctx_.blackboard.ValueOr("path", std::vector<Vector2f>());
+  constexpr float kNearbyTurn = 20.0f;
+  constexpr float kMaxAvoidDistance = 35.0f;
+
+  if (!path.empty() && path[0].DistanceSq(game_->GetPosition()) < kNearbyTurn * kNearbyTurn) {
+    steering_.AvoidWalls(kMaxAvoidDistance);
+  }
+#endif
 
 #if DEBUG_RENDER
   RenderPath(GetGame(), behavior_ctx_.blackboard);
