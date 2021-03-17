@@ -14,6 +14,8 @@
 #include "platform/ContinuumGameProxy.h"
 #include "platform/ExeProcess.h"
 
+#include <ddraw.h>
+
 const char* kEnabledText = "Continuum (enabled)";
 const char* kDisabledText = "Continuum (disabled)";
 
@@ -29,6 +31,22 @@ static time_point g_LastUpdateTime;
 static SHORT(WINAPI* RealGetAsyncKeyState)(int vKey) = GetAsyncKeyState;
 static BOOL(WINAPI* RealPeekMessageA)(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin, UINT wMsgFilterMax,
                                       UINT wRemoveMsg) = PeekMessageA;
+static HRESULT(STDMETHODCALLTYPE* RealBlt)(LPDIRECTDRAWSURFACE, LPRECT, LPDIRECTDRAWSURFACE, LPRECT, DWORD, LPDDBLTFX);
+
+HRESULT STDMETHODCALLTYPE OverrideBlt(LPDIRECTDRAWSURFACE surface, LPRECT dest_rect, LPDIRECTDRAWSURFACE next_surface, LPRECT src_rect, DWORD flags,
+                                      LPDDBLTFX fx) {
+
+  u32 graphics_addr = *(u32*)(0x4C1AFC) + 0x30;
+  LPDIRECTDRAWSURFACE primary_surface = (LPDIRECTDRAWSURFACE)*(u32*)(graphics_addr + 0x40);
+  LPDIRECTDRAWSURFACE back_surface = (LPDIRECTDRAWSURFACE)*(u32*)(graphics_addr + 0x44);
+
+  // Check if flipping. I guess there's a full screen blit instead of flip when running without vsync?
+  if (surface == primary_surface && next_surface == back_surface && fx == 0) {
+    marvin::g_RenderState.Render();
+  }
+
+  return RealBlt(surface, dest_rect, next_surface, src_rect, flags, fx);
+}
 
 SHORT WINAPI OverrideGetAsyncKeyState(int vKey) {
 #if DEBUG_USER_CONTROL
@@ -69,12 +87,13 @@ BOOL WINAPI OverridePeekMessageA(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin, UIN
 
   if (g_Enabled) {
     if (dt.count() >= 1.0f / 60.0f) {
+#if DEBUG_RENDER
+      marvin::g_RenderState.renderable_texts.clear();
+      marvin::g_RenderState.renderable_lines.clear();
+#endif
+
       g_Bot->Update(dt.count());
       g_LastUpdateTime = now;
-
-#if DEBUG_RENDER
-      marvin::WaitForSync();
-#endif
     }
   }
 
@@ -129,12 +148,20 @@ extern "C" __declspec(dllexport) void InitializeMarvin() {
     MessageBox(NULL, e.what(), "A", MB_OK);
   }
 
+  u32 graphics_addr = *(u32*)(0x4C1AFC) + 0x30;
+  LPDIRECTDRAWSURFACE surface = (LPDIRECTDRAWSURFACE) * (u32*)(graphics_addr + 0x44);
+  void** vtable = (*(void***)surface);
+  RealBlt = (HRESULT(STDMETHODCALLTYPE*)(LPDIRECTDRAWSURFACE surface, LPRECT, LPDIRECTDRAWSURFACE, LPRECT, DWORD, LPDDBLTFX))vtable[5];
+
   DetourRestoreAfterWith();
 
   DetourTransactionBegin();
   DetourUpdateThread(GetCurrentThread());
   DetourAttach(&(PVOID&)RealGetAsyncKeyState, OverrideGetAsyncKeyState);
   DetourAttach(&(PVOID&)RealPeekMessageA, OverridePeekMessageA);
+#if DEBUG_RENDER
+  DetourAttach(&(PVOID&)RealBlt, OverrideBlt);
+#endif
   DetourTransactionCommit();
 
   SetWindowText(g_hWnd, kEnabledText);
@@ -147,6 +174,9 @@ extern "C" __declspec(dllexport) void CleanupMarvin() {
   DetourUpdateThread(GetCurrentThread());
   DetourDetach(&(PVOID&)RealGetAsyncKeyState, OverrideGetAsyncKeyState);
   DetourDetach(&(PVOID&)RealPeekMessageA, OverridePeekMessageA);
+#if DEBUG_RENDER
+  DetourDetach(&(PVOID&)RealBlt, OverrideBlt);
+#endif
   DetourTransactionCommit();
 
   SetWindowText(g_hWnd, "Continuum");

@@ -1,25 +1,62 @@
 #include "Debug.h"
 
+#include "Types.h"
+#include <ddraw.h>
+
+#pragma comment(lib, "ddraw.lib")
+#pragma comment(lib, "dxguid.lib")
+
 namespace marvin {
+
+RenderState g_RenderState;
 
 std::ofstream debug_log;
 
 #if DEBUG_RENDER
 
-#include <dwmapi.h>
-#pragma comment(lib, "dwmapi.lib")
+void RenderState::Render() {
+  u32 graphics_addr = *(u32*)(0x4C1AFC) + 0x30;
+  LPDIRECTDRAWSURFACE back_surface = (LPDIRECTDRAWSURFACE) * (u32*)(graphics_addr + 0x44);
 
-void RenderLine(Vector2f from, Vector2f to, COLORREF color) {
-  HDC hdc = GetDC(g_hWnd);
+  typedef void(__fastcall * RenderTextFunc)(void* This, void* thiscall_garbage, int x, int y, const char* text,
+                                            int zero, int length, u8 alpha);
+
+  RenderTextFunc render_text = (RenderTextFunc)(0x442FE0);
+  void* This = (void*)(graphics_addr);
+
+  HDC hdc;
+  back_surface->GetDC(&hdc);
 
   HGDIOBJ obj = SelectObject(hdc, GetStockObject(DC_PEN));
 
-  SetDCPenColor(hdc, color);
+  for (RenderableLine& renderable : renderable_lines) {
+    SetDCPenColor(hdc, renderable.color);
+    MoveToEx(hdc, (int)renderable.from.x, (int)renderable.from.y, NULL);
+    LineTo(hdc, (int)renderable.to.x, (int)renderable.to.y);
+  }
 
-  MoveToEx(hdc, (int)from.x, (int)from.y, NULL);
-  LineTo(hdc, (int)to.x, (int)to.y);
+  back_surface->ReleaseDC(hdc);
 
-  ReleaseDC(g_hWnd, hdc);
+  for (RenderableText& renderable : renderable_texts) {
+    u32 x = (u32)renderable.at.x;
+    u32 y = (u32)renderable.at.y;
+
+    if (renderable.flags & RenderText_Centered) {
+      x -= (u32)((renderable.text.length() / 2.0f) * 8.0f);
+    }
+
+    render_text(This, 0, x, y, renderable.text.c_str(), (int)renderable.color, -1, 1);
+  }
+}
+
+void RenderLine(Vector2f from, Vector2f to, COLORREF color) {
+  RenderableLine renderable;
+
+  renderable.from = from;
+  renderable.to = to;
+  renderable.color = color;
+
+  g_RenderState.renderable_lines.push_back(renderable);
 }
 
 void RenderWorldLine(Vector2f screenCenterWorldPosition, Vector2f from, Vector2f to, COLORREF color) {
@@ -32,33 +69,25 @@ void RenderWorldLine(Vector2f screenCenterWorldPosition, Vector2f from, Vector2f
   RenderLine(center + from, center + to, color);
 }
 
-void RenderText(const char* text, Vector2f at, COLORREF color, int flags) {
-  HDC hdc = GetDC(g_hWnd);
+void RenderText(const char* text, Vector2f at, TextColor color, int flags) {
+  RenderableText renderable;
 
-  HGDIOBJ obj = SelectObject(hdc, GetStockObject(DC_BRUSH));
+  renderable.text = std::string(text);
+  renderable.at = at;
+  renderable.color = color;
+  renderable.flags = flags;
 
-  SetDCBrushColor(hdc, color);
-
-  SetBkColor(hdc, RGB(0, 0, 0));
-  SetTextColor(hdc, RGB(255, 255, 255));
-  if (flags & RenderText_Centered) {
-    SetTextAlign(hdc, TA_CENTER);
-  }
-  TextOutA(hdc, (int)at.x, (int)at.y, text, strlen(text));
-
-  ReleaseDC(g_hWnd, hdc);
-}
-
-void WaitForSync() {
-  DwmFlush();
+  g_RenderState.renderable_texts.push_back(std::move(renderable));
 }
 
 #else
 
+void RenderState::Render() {}
+
 void RenderLine(Vector2f from, Vector2f to, COLORREF color) {}
 void RenderWorldLine(Vector2f screenCenterWorldPosition, Vector2f from, Vector2f to, COLORREF color) {}
-void RenderText(const char* text, Vector2f at, COLORREF color, int flags) {}
-void WaitForSync() {}
+void RenderText(const char* text, Vector2f at, TextColor color, int flags) {}
+
 #endif
 
 Vector2f GetWindowCenter() {

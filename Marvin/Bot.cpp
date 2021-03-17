@@ -216,7 +216,7 @@ public:
       running_ = true;
     }
 
-    RenderText("BundleShots", GetWindowCenter() + Vector2f(0, 100), RGB(100, 100, 100), RenderText_Centered);
+    RenderText("BundleShots", GetWindowCenter() + Vector2f(0, 100), TextColor::White, RenderText_Centered);
 
     ctx.bot->Move(target.position, 0.0f);
     ctx.bot->GetSteering().Face(target.position);
@@ -667,7 +667,7 @@ void Bot::Steer() {
 
   // Cap the steering direction so it's pointing toward the rotate target.
   if (steering_direction.Dot(rotate_target) < 0.75) {
-    RenderText("adjusting", center - Vector2f(0, debug_y), RGB(100, 100, 100), RenderText_Centered);
+    RenderText("adjusting", center - Vector2f(0, debug_y), TextColor::White, RenderText_Centered);
     debug_y -= 20;
     float rotation = 0.1f;
     int sign = leftside ? 1 : -1;
@@ -711,26 +711,26 @@ void Bot::Steer() {
   RenderLine(center, center + (steering_direction * 75), RGB(0, 255, 0));
 
   if (rotation == 0.0f) {
-    RenderText("no rotation", center - Vector2f(0, debug_y), RGB(100, 100, 100), RenderText_Centered);
+    RenderText("no rotation", center - Vector2f(0, debug_y), TextColor::White, RenderText_Centered);
     debug_y -= 20;
   } else {
     std::string text = "rotation: " + std::to_string(rotation);
-    RenderText(text.c_str(), center - Vector2f(0, debug_y), RGB(100, 100, 100), RenderText_Centered);
+    RenderText(text.c_str(), center - Vector2f(0, debug_y), TextColor::White, RenderText_Centered);
     debug_y -= 20;
   }
 
   if (behind) {
-    RenderText("behind", center - Vector2f(0, debug_y), RGB(100, 100, 100), RenderText_Centered);
+    RenderText("behind", center - Vector2f(0, debug_y), TextColor::White, RenderText_Centered);
     debug_y -= 20;
   }
 
   if (leftside) {
-    RenderText("leftside", center - Vector2f(0, debug_y), RGB(100, 100, 100), RenderText_Centered);
+    RenderText("leftside", center - Vector2f(0, debug_y), TextColor::White, RenderText_Centered);
     debug_y -= 20;
   }
 
   if (rotation != 0.0f) {
-    RenderText("face-locked", center - Vector2f(0, debug_y), RGB(100, 100, 100), RenderText_Centered);
+    RenderText("face-locked", center - Vector2f(0, debug_y), TextColor::White, RenderText_Centered);
     debug_y -= 20;
   }
 #endif
