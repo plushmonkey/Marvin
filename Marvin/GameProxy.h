@@ -29,6 +29,18 @@ struct ShipStatus {
   u32 shrapnel;
 };
 
+struct Flag {
+  u32 id;
+  u32 frequency;
+  Vector2f position;
+
+  Flag(u32 id, u32 freq, Vector2f pos) : id(id), frequency(freq), position(pos) {}
+
+  bool IsNeutral() const {
+    return frequency == 0xFFFFFFFF;
+  }
+};
+
 class GameProxy {
 public:
   virtual ~GameProxy() {}
@@ -50,6 +62,7 @@ public:
   virtual const Player* GetPlayerById(u16 id) const = 0;
 
   virtual std::vector<Weapon*> GetWeapons() = 0;
+  virtual std::vector<Flag> GetDroppedFlags() = 0;
 
   // May need to be called more than once to transition the game menu
   // Returns true if it attempts to set the ship this call.

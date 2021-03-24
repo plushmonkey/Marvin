@@ -76,6 +76,7 @@ public:
   const Player* GetPlayerById(u16 id) const override;
 
   std::vector<Weapon*> GetWeapons() override;
+  std::vector<Flag> GetDroppedFlags() override;
 
   bool SetShip(int ship) override;
   void Warp() override;
