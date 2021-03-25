@@ -26,6 +26,7 @@ struct Player {
   uint8_t status;
 
   int32_t bounty;
+  int32_t flags;
 
   Vector2f GetHeading() const {
     const float kToRads = (static_cast<float>(M_PI) / 180.0f);

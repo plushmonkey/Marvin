@@ -77,6 +77,8 @@ void ContinuumGameProxy::FetchPlayers() {
   const std::size_t kIdOffset = 0x18;
   const std::size_t kBountyOffset1 = 0x20;
   const std::size_t kBountyOffset2 = 0x24;
+  const std::size_t kFlagOffset1 = 0x30;
+  const std::size_t kFlagOffset2 = 0x34;
   const std::size_t kRotOffset = 0x3C;
   const std::size_t kShipOffset = 0x5C;
   const std::size_t kFreqOffset = 0x58;
@@ -118,6 +120,7 @@ void ContinuumGameProxy::FetchPlayers() {
     player.name = process_.ReadString(player_addr + kNameOffset, 23);
 
     player.bounty = *(u32*)(player_addr + kBountyOffset1) + *(u32*)(player_addr + kBountyOffset2);
+    player.flags = *(u32*)(player_addr + kFlagOffset1) + *(u32*)(player_addr + kFlagOffset2);
 
     if (player.id == player_id_) {
       // Energy calculation @4485FA
