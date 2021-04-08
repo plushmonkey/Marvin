@@ -25,20 +25,25 @@ using seconds = std::chrono::duration<float>;
 
 std::unique_ptr<marvin::Bot> g_Bot;
 static bool g_Enabled = true;
+static bool g_Reload = false;
 HWND g_hWnd = 0;
 static time_point g_LastUpdateTime;
+
+HWND GetMainWindow();
+marvin::Bot& CreateBot();
 
 static SHORT(WINAPI* RealGetAsyncKeyState)(int vKey) = GetAsyncKeyState;
 static BOOL(WINAPI* RealPeekMessageA)(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin, UINT wMsgFilterMax,
                                       UINT wRemoveMsg) = PeekMessageA;
+static BOOL(WINAPI* RealGetMessageA)(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin, UINT wMsgFilterMax) = GetMessageA;
 static HRESULT(STDMETHODCALLTYPE* RealBlt)(LPDIRECTDRAWSURFACE, LPRECT, LPDIRECTDRAWSURFACE, LPRECT, DWORD, LPDDBLTFX);
 
-HRESULT STDMETHODCALLTYPE OverrideBlt(LPDIRECTDRAWSURFACE surface, LPRECT dest_rect, LPDIRECTDRAWSURFACE next_surface, LPRECT src_rect, DWORD flags,
-                                      LPDDBLTFX fx) {
+HRESULT STDMETHODCALLTYPE OverrideBlt(LPDIRECTDRAWSURFACE surface, LPRECT dest_rect, LPDIRECTDRAWSURFACE next_surface,
+                                      LPRECT src_rect, DWORD flags, LPDDBLTFX fx) {
 
   u32 graphics_addr = *(u32*)(0x4C1AFC) + 0x30;
-  LPDIRECTDRAWSURFACE primary_surface = (LPDIRECTDRAWSURFACE)*(u32*)(graphics_addr + 0x40);
-  LPDIRECTDRAWSURFACE back_surface = (LPDIRECTDRAWSURFACE)*(u32*)(graphics_addr + 0x44);
+  LPDIRECTDRAWSURFACE primary_surface = (LPDIRECTDRAWSURFACE) * (u32*)(graphics_addr + 0x40);
+  LPDIRECTDRAWSURFACE back_surface = (LPDIRECTDRAWSURFACE) * (u32*)(graphics_addr + 0x44);
 
   // Check if flipping. I guess there's a full screen blit instead of flip when running without vsync?
   if (surface == primary_surface && next_surface == back_surface && fx == 0) {
@@ -68,6 +73,25 @@ SHORT WINAPI OverrideGetAsyncKeyState(int vKey) {
   return 0;
 }
 
+bool IsGameLoaded() {
+  u32 game_addr = *(u32*)0x4C1AFC;
+
+  if (game_addr != 0) {
+    // Wait for map to load
+    return *(u32*)(game_addr + 0x127ec + 0x6C4) != 0;
+  }
+
+  return false;
+}
+
+BOOL WINAPI OverrideGetMessageA(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin, UINT wMsgFilterMax) {
+  if (!IsGameLoaded()) {
+    g_Reload = true;
+  }
+
+  return RealGetMessageA(lpMsg, hWnd, wMsgFilterMin, wMsgFilterMax);
+}
+
 // This is used to hook into the main update loop in Continuum so the bot can be
 // updated.
 BOOL WINAPI OverridePeekMessageA(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin, UINT wMsgFilterMax, UINT wRemoveMsg) {
@@ -78,6 +102,18 @@ BOOL WINAPI OverridePeekMessageA(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin, UIN
       SetWindowText(g_hWnd, kDisabledText);
     } else if (RealGetAsyncKeyState(VK_F9)) {
       g_Enabled = true;
+      SetWindowText(g_hWnd, kEnabledText);
+    }
+  }
+
+  if (g_Reload) {
+    g_Enabled = false;
+
+    if (IsGameLoaded()) {
+      CreateBot();
+      g_Enabled = true;
+      g_Reload = false;
+      g_hWnd = GetMainWindow();
       SetWindowText(g_hWnd, kEnabledText);
     }
   }
@@ -151,7 +187,8 @@ extern "C" __declspec(dllexport) void InitializeMarvin() {
   u32 graphics_addr = *(u32*)(0x4C1AFC) + 0x30;
   LPDIRECTDRAWSURFACE surface = (LPDIRECTDRAWSURFACE) * (u32*)(graphics_addr + 0x44);
   void** vtable = (*(void***)surface);
-  RealBlt = (HRESULT(STDMETHODCALLTYPE*)(LPDIRECTDRAWSURFACE surface, LPRECT, LPDIRECTDRAWSURFACE, LPRECT, DWORD, LPDDBLTFX))vtable[5];
+  RealBlt = (HRESULT(STDMETHODCALLTYPE*)(LPDIRECTDRAWSURFACE surface, LPRECT, LPDIRECTDRAWSURFACE, LPRECT, DWORD,
+                                         LPDDBLTFX))vtable[5];
 
   DetourRestoreAfterWith();
 
@@ -159,6 +196,7 @@ extern "C" __declspec(dllexport) void InitializeMarvin() {
   DetourUpdateThread(GetCurrentThread());
   DetourAttach(&(PVOID&)RealGetAsyncKeyState, OverrideGetAsyncKeyState);
   DetourAttach(&(PVOID&)RealPeekMessageA, OverridePeekMessageA);
+  DetourAttach(&(PVOID&)RealGetMessageA, OverrideGetMessageA);
 #if DEBUG_RENDER
   DetourAttach(&(PVOID&)RealBlt, OverrideBlt);
 #endif
@@ -173,7 +211,7 @@ extern "C" __declspec(dllexport) void CleanupMarvin() {
   DetourTransactionBegin();
   DetourUpdateThread(GetCurrentThread());
   DetourDetach(&(PVOID&)RealGetAsyncKeyState, OverrideGetAsyncKeyState);
-  DetourDetach(&(PVOID&)RealPeekMessageA, OverridePeekMessageA);
+  DetourDetach(&(PVOID&)RealGetMessageA, OverrideGetMessageA);
 #if DEBUG_RENDER
   DetourDetach(&(PVOID&)RealBlt, OverrideBlt);
 #endif
