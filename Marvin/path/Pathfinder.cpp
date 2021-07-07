@@ -55,11 +55,14 @@ NodePoint ToNodePoint(const Vector2f v) {
   return np;
 }
 
-float Euclidean(const Node* from, const Node* to) {
-  float dx = static_cast<float>(from->point.x - to->point.x);
-  float dy = static_cast<float>(from->point.y - to->point.y);
+inline float Euclidean(NodeProcessor& processor, const Node* from, const Node* to) {
+  NodePoint from_p = processor.GetPoint(from);
+  NodePoint to_p = processor.GetPoint(to);
 
-  return std::sqrt(dx * dx + dy * dy);
+  float dx = static_cast<float>(from_p.x - to_p.x);
+  float dy = static_cast<float>(from_p.y - to_p.y);
+
+  return sqrt(dx * dx + dy * dy);
 }
 
 Pathfinder::Pathfinder(std::unique_ptr<NodeProcessor> processor, RegionRegistry& regions)
@@ -68,7 +71,12 @@ Pathfinder::Pathfinder(std::unique_ptr<NodeProcessor> processor, RegionRegistry&
 std::vector<Vector2f> Pathfinder::FindPath(const Vector2f& from, const Vector2f& to, float radius) {
   std::vector<Vector2f> path;
 
-  processor_->ResetNodes();
+  // Clear the touched nodes before pathfinding.
+  for (Node* node : touched_nodes_) {
+    // Setting the flag to zero causes GetNode to reset the node on next fetch.
+    node->flags = 0;
+  }
+  touched_nodes_.clear();
 
   Node* start = processor_->GetNode(ToNodePoint(from));
   Node* goal = processor_->GetNode(ToNodePoint(to));
@@ -77,72 +85,68 @@ std::vector<Vector2f> Pathfinder::FindPath(const Vector2f& from, const Vector2f&
     return path;
   }
 
-  if (!regions_.IsConnected(MapCoord(start->point.x, start->point.y), MapCoord(goal->point.x, goal->point.y))) {
+  NodePoint start_p = processor_->GetPoint(start);
+  NodePoint goal_p = processor_->GetPoint(goal);
+
+  if (!regions_.IsConnected(MapCoord(start_p.x, start_p.y), MapCoord(goal_p.x, goal_p.y))) {
     return path;
   }
 
   openset_.Clear();
   openset_.Push(start);
 
+  touched_nodes_.insert(start);
+  touched_nodes_.insert(goal);
+
   while (!openset_.Empty()) {
     Node* node = openset_.Pop();
+
+    touched_nodes_.insert(node);
 
     if (node == goal) {
       break;
     }
 
-    node->closed = true;
+    node->flags |= NodeFlag_Closed;
 
     NodeConnections connections = processor_->FindEdges(node, start, goal, radius);
 
     for (std::size_t i = 0; i < connections.count; ++i) {
       Node* edge = connections.neighbors[i];
-      float dx = (float)(node->point.x - edge->point.x);
-      float dy = (float)(node->point.y - edge->point.y);
-      float d = std::sqrt(dx * dx + dy * dy);
-      float cost = node->g + edge->weight * d;
 
-      Node* parent = node->parent;
-      if (parent) {
-        NodePoint parent_diff(parent->point.x - node->point.x, parent->point.y - node->point.y);
-        NodePoint current_diff(node->point.x - edge->point.x, node->point.y - edge->point.y);
+      touched_nodes_.insert(edge);
 
-        edge->rotations = node->rotations;
+      float cost = node->g + edge->weight * Euclidean(*processor_, node, edge);
 
-        if (parent_diff.x != current_diff.x || parent_diff.y != current_diff.y) {
-          ++edge->rotations;
-        }
+      if ((edge->flags & NodeFlag_Closed) && cost < edge->g) {
+        edge->flags &= ~NodeFlag_Closed;
       }
 
-      if (edge->closed && cost < edge->g) {
-        edge->closed = false;
-      }
+      float h = Euclidean(*processor_, edge, goal);
 
-      if (edge->openset && cost < edge->g) {
+      if (!(edge->flags & NodeFlag_Openset) || cost + h < edge->f) {
         edge->g = cost;
-        edge->f = edge->g + edge->h;
+        edge->f = edge->g + h;
         edge->parent = node;
-        openset_.Update();
-      } else if (!edge->openset && !edge->closed) {
-        edge->g = cost;
-        edge->h = Euclidean(goal, edge);
-        edge->f = edge->g + edge->h;
-        edge->parent = node;
+
+        edge->flags |= NodeFlag_Openset;
+
         openset_.Push(edge);
-        edge->openset = true;
       }
     }
   }
 
   if (goal->parent) {
-    path.push_back(Vector2f(start->point.x + 0.5f, start->point.y + 0.5f));
+    path.push_back(Vector2f(start_p.x + 0.5f, start_p.y + 0.5f));
   }
 
   // Construct path backwards from goal node
   std::vector<NodePoint> points;
   Node* current = goal;
+
   while (current != nullptr && current != start) {
-    points.push_back(current->point);
+    NodePoint p = processor_->GetPoint(current);
+    points.push_back(p);
     current = current->parent;
   }
 

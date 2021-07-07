@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <unordered_set>
 #include <vector>
 
 #include "../RegionRegistry.h"
@@ -67,8 +68,6 @@ public:
 private:
   struct NodeCompare {
     bool operator()(const Node* lhs, const Node* rhs) const {
-      if (lhs->f == rhs->f)
-        return lhs->rotations > rhs->rotations;
       return lhs->f > rhs->f;
     }
   };
@@ -76,6 +75,7 @@ private:
   std::unique_ptr<NodeProcessor> processor_;
   RegionRegistry& regions_;
   PriorityQueue<Node*, NodeCompare> openset_;
+  std::unordered_set<Node*> touched_nodes_;
 };
 
 } // namespace path

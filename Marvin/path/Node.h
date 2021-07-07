@@ -19,18 +19,21 @@ struct NodePoint {
   }
 };
 
-struct Node {
-  NodePoint point;
-  Node* parent;
-  float g;
-  float h;
-  float f;
-  float weight;
-  uint32_t rotations;
-  bool closed;
-  bool openset;
+enum { NodeFlag_Openset = (1 << 0), NodeFlag_Closed = (1 << 1), NodeFlag_Initialized = (1 << 2) };
+typedef u32 NodeFlags;
 
-  Node() : closed(false), openset(false), parent(nullptr), g(0), h(0), f(0), weight(1), rotations(0) {}
+struct Node {
+  Node* parent;
+
+  float g;
+  float f;
+
+  float weight;
+  float previous_weight;
+
+  u8 flags;
+
+  Node() : flags(0), parent(nullptr), g(0.0f), f(0.0f), weight(1.0f), previous_weight(1.0f) {}
 };
 
 } // namespace path

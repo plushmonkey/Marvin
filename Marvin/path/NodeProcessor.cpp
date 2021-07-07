@@ -8,12 +8,16 @@ NodeConnections NodeProcessor::FindEdges(Node* node, Node* start, Node* goal, fl
 
   connections.count = 0;
 
+  NodePoint base_point = GetPoint(node);
+
   for (int y = -1; y <= 1; ++y) {
     for (int x = -1; x <= 1; ++x) {
-      if (x == 0 && y == 0)
+      if (x == 0 && y == 0) {
         continue;
-      uint16_t world_x = node->point.x + x;
-      uint16_t world_y = node->point.y + y;
+      }
+
+      uint16_t world_x = base_point.x + x;
+      uint16_t world_y = base_point.y + y;
 
       if (map_.IsSolid(world_x, world_y))
         continue;
@@ -42,18 +46,6 @@ NodeConnections NodeProcessor::FindEdges(Node* node, Node* start, Node* goal, fl
   return connections;
 }
 
-void NodeProcessor::ResetNodes() {
-  for (std::size_t i = 0; i < 1024 * 1024; ++i) {
-    Node* node = &nodes_[i];
-
-    node->closed = false;
-    node->openset = false;
-    node->g = node->h = node->f = 0;
-    node->parent = nullptr;
-    node->rotations = 0;
-  }
-}
-
 Node* NodeProcessor::GetNode(NodePoint point) {
   if (point.x >= 1024 || point.y >= 1024) {
     return nullptr;
@@ -62,11 +54,9 @@ Node* NodeProcessor::GetNode(NodePoint point) {
   std::size_t index = point.y * 1024 + point.x;
   Node* node = &nodes_[index];
 
-  if (node->point.x != point.x) {
-    node->point = point;
-    node->g = node->h = node->f = 0;
-    node->closed = false;
-    node->openset = false;
+  if (!(node->flags & NodeFlag_Initialized)) {
+    node->g = node->f = 0.0f;
+    node->flags = NodeFlag_Initialized;
     node->parent = nullptr;
   }
 
