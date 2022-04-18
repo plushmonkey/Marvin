@@ -587,6 +587,8 @@ void RenderPath(GameProxy& game, behavior::Blackboard& blackboard) {
 }
 
 void Bot::Update(float dt) {
+  g_RenderState.debug_y = 30.0f;
+
   keys_.ReleaseAll();
   game_->Update(dt);
 

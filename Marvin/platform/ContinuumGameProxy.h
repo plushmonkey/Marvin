@@ -9,29 +9,41 @@
 namespace marvin {
 
 #pragma pack(push, 1)
-struct WeaponData {
-  u32 _unused1;
+struct WeaponMemory {
+  u32 vtable; // 0x00
 
   u32 x; // 0x04
   u32 y; // 0x08
 
-  u32 _unuseda;
-  i32 velocity_x;
-  i32 velocity_y;
-  u32 _unused2[32];
+  u32 _unuseda;   // 0x0C
+  i32 velocity_x; // 0x10
+  i32 velocity_y; // 0x14
+
+  u32 _unused2[29];
+
+  s32 remaining_bounces; // 0x8C
+
+  u32 _unused3[2];
 
   u32 pid; // 0x98
 
-  char _unused3[11];
+  char _unused4[11];
 
-  u16 type;
+  WeaponData data; // a7-a9
+
+  char _unused5[23];
+  u32 alive_ticks;
+
+  u32 _unused6[1];
 };
 #pragma pack(pop)
+
+static_assert(sizeof(WeaponMemory) > 0x40);
 
 // In memory weapon data
 class ContinuumWeapon : public Weapon {
 public:
-  ContinuumWeapon(WeaponData* data) : weapon_(data) {}
+  ContinuumWeapon(WeaponMemory* memory, u32 remaining_ticks) : weapon_(memory), remaining_ticks_(remaining_ticks) {}
 
   u16 GetPlayerId() const {
     return weapon_->pid;
@@ -42,15 +54,28 @@ public:
   }
 
   Vector2f GetVelocity() const {
-    return Vector2f(weapon_->velocity_x / 1000.0f / 16.0f, weapon_->velocity_y / 1000.0f / 16.0f);
+    return Vector2f(weapon_->velocity_x / 10.0f / 16.0f, weapon_->velocity_y / 10.0f / 16.0f);
   }
 
-  u16 GetType() const {
-    return weapon_->type;
+  WeaponData GetData() const {
+    return weapon_->data;
+  }
+  
+  u32 GetAliveTicks() const {
+    return weapon_->alive_ticks;
+  }
+
+  u32 GetRemainingTicks() const {
+    return remaining_ticks_;
+  }
+
+  s32 GetRemainingBounces() const {
+    return weapon_->remaining_bounces;
   }
 
 private:
-  WeaponData* weapon_;
+  WeaponMemory* weapon_;
+  u32 remaining_ticks_;
 };
 
 class ContinuumGameProxy : public GameProxy {
@@ -77,6 +102,7 @@ public:
 
   std::vector<Weapon*> GetWeapons() override;
   std::vector<Flag> GetDroppedFlags() override;
+  const std::vector<Green>& GetGreens() const override;
 
   bool SetShip(int ship) override;
   void Warp() override;
@@ -90,7 +116,10 @@ public:
 
 private:
   void SendKey(int vKey);
+
   void FetchPlayers();
+  void FetchWeapons();
+  void FetchGreens();
 
   ExeProcess process_;
   HWND hwnd_;
@@ -105,6 +134,7 @@ private:
   std::vector<Player> players_;
   std::vector<ContinuumWeapon> weapons_;
   ShipStatus ship_status_;
+  std::vector<Green> greens_;
 };
 
 } // namespace marvin

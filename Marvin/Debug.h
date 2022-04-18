@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <vector>
+#include <string>
 
 #include "Vector2f.h"
 #include "platform/Platform.h"
@@ -35,17 +36,22 @@ struct RenderableLine {
 };
 
 struct RenderState {
+  static const bool kDisplayDebugText;
+  float debug_y;
+
   std::vector<RenderableText> renderable_texts;
   std::vector<RenderableLine> renderable_lines;
 
   void Render();
+
+  void RenderDebugText(const char* fmt, ...);
 };
 
 extern RenderState g_RenderState;
 
 void RenderLine(Vector2f from, Vector2f to, COLORREF color);
 void RenderWorldLine(Vector2f screenCenterWorldPosition, Vector2f from, Vector2f to, COLORREF color);
-void RenderText(const char* text, Vector2f at, TextColor color, int flags = 0);
+void RenderText(const std::string& text, Vector2f at, TextColor color, int flags = 0);
 
 Vector2f GetWindowCenter();
 

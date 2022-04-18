@@ -154,6 +154,7 @@
     <ClCompile Include="Bot.cpp" />
     <ClCompile Include="Debug.cpp" />
     <ClCompile Include="hyperspace\Hyperspace.cpp" />
+    <ClCompile Include="InfluenceMap.cpp" />
     <ClCompile Include="KeyController.cpp" />
     <ClCompile Include="Map.cpp" />
     <ClCompile Include="path\NodeProcessor.cpp" />
@@ -175,6 +176,7 @@
     <ClInclude Include="Debug.h" />
     <ClInclude Include="Hash.h" />
     <ClInclude Include="hyperspace\Hyperspace.h" />
+    <ClInclude Include="InfluenceMap.h" />
     <ClInclude Include="KeyController.h" />
     <ClInclude Include="Map.h" />
     <ClInclude Include="path\Node.h" />

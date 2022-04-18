@@ -51,24 +51,8 @@ void ContinuumGameProxy::Update(float dt) {
   }
 
   FetchPlayers();
-
-  // Grab the address to the main player structure
-  u32 player_addr = *(u32*)(game_addr_ + 0x13070);
-
-  // Follow a pointer that leads to weapon data
-  u32 ptr = *(u32*)(player_addr + 0x0C);
-  u32 weapon_count = *(u32*)(ptr + 0x1DD0) + *(u32*)(ptr + 0x1DD4);
-  u32 weapon_ptrs = (ptr + 0x21F4);
-
-  weapons_.clear();
-
-  for (size_t i = 0; i < weapon_count; ++i) {
-    u32 weapon_data = *(u32*)(weapon_ptrs + i * 4);
-
-    WeaponData* data = (WeaponData*)(weapon_data);
-
-    weapons_.emplace_back(data);
-  }
+  FetchWeapons();
+  FetchGreens();
 }
 
 void ContinuumGameProxy::FetchPlayers() {
@@ -149,7 +133,73 @@ void ContinuumGameProxy::FetchPlayers() {
       ship_status_.shrapnel = *(u32*)(player_addr + 0x2A8) + *(u32*)(player_addr + 0x2AC);
       ship_status_.thrust = *(u32*)(player_addr + 0x244) + *(u32*)(player_addr + 0x248);
       ship_status_.speed = *(u32*)(player_addr + 0x350) + *(u32*)(player_addr + 0x354);
+      ship_status_.max_energy = *(u32*)(player_addr + 0x1C8) + *(u32*)(player_addr + 0x1C4);
     }
+  }
+}
+
+void ContinuumGameProxy::FetchWeapons() {
+  // Grab the address to the main player structure
+  u32 player_addr = *(u32*)(game_addr_ + 0x13070);
+
+  // Follow a pointer that leads to weapon data
+  u32 ptr = *(u32*)(player_addr + 0x0C);
+  u32 weapon_count = *(u32*)(ptr + 0x1DD0) + *(u32*)(ptr + 0x1DD4);
+  u32 weapon_ptrs = (ptr + 0x21F4);
+
+  weapons_.clear();
+
+  for (size_t i = 0; i < weapon_count; ++i) {
+    u32 weapon_data = *(u32*)(weapon_ptrs + i * 4);
+
+    WeaponMemory* data = (WeaponMemory*)(weapon_data);
+    WeaponType type = data->data.type;
+
+    u32 total_ticks = 0;
+    
+    switch (type) {
+        case WeaponType::Bomb:
+        case WeaponType::ProximityBomb:
+        case WeaponType::Thor: {
+          total_ticks = this->GetSettings().BombAliveTime;
+          if (data->data.alternate) {
+            total_ticks = this->GetSettings().MineAliveTime;
+          }
+        } break;
+        case WeaponType::Burst:
+        case WeaponType::Bullet:
+        case WeaponType::BouncingBullet: {
+          total_ticks = this->GetSettings().BulletAliveTime;
+        } break;
+        case WeaponType::Repel: {
+          total_ticks = this->GetSettings().RepelTime;
+        } break;
+        case WeaponType::Decoy: {
+          total_ticks = this->GetSettings().DecoyAliveTime;
+        } break;
+        default: {
+          total_ticks = this->GetSettings().BulletAliveTime;
+        } break;
+    }
+
+    u32 alive_ticks = data->alive_ticks;
+
+    if (alive_ticks > total_ticks) {
+      alive_ticks = total_ticks;
+    }
+
+    weapons_.emplace_back(data, total_ticks - alive_ticks);
+  }
+}
+
+void ContinuumGameProxy::FetchGreens() {
+  greens_.clear();
+
+  u32 green_count = *(u32*)(game_addr_ + 0x2e350);
+  Green* greens = (Green*)(game_addr_ + 0x2df50);
+
+  for (size_t i = 0; i < green_count; ++i) {
+    greens_.push_back(greens[i]);
   }
 }
 
@@ -185,6 +235,10 @@ std::vector<Flag> ContinuumGameProxy::GetDroppedFlags() {
   }
 
   return flags;
+}
+
+const std::vector<Green>& ContinuumGameProxy::GetGreens() const {
+  return greens_;
 }
 
 const ClientSettings& ContinuumGameProxy::GetSettings() const {

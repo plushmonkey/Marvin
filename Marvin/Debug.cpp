@@ -10,6 +10,8 @@ namespace marvin {
 
 RenderState g_RenderState;
 
+const bool RenderState::kDisplayDebugText = true;
+
 std::ofstream debug_log;
 
 #if DEBUG_RENDER
@@ -49,6 +51,22 @@ void RenderState::Render() {
   }
 }
 
+void RenderState::RenderDebugText(const char* fmt, ...) {
+  if (!kDisplayDebugText)
+    return;
+
+  char buffer[2048];
+
+  va_list args;
+
+  va_start(args, fmt);
+  vsprintf_s(buffer, fmt, args);
+  va_end(args);
+
+  RenderText(std::string(buffer), Vector2f(GetWindowCenter().x + 150.0f, debug_y), TextColor::Pink, 0);
+  debug_y += 12.0f;
+}
+
 void RenderLine(Vector2f from, Vector2f to, COLORREF color) {
   RenderableLine renderable;
 
@@ -69,10 +87,10 @@ void RenderWorldLine(Vector2f screenCenterWorldPosition, Vector2f from, Vector2f
   RenderLine(center + from, center + to, color);
 }
 
-void RenderText(const char* text, Vector2f at, TextColor color, int flags) {
+void RenderText(const std::string& text, Vector2f at, TextColor color, int flags) {
   RenderableText renderable;
 
-  renderable.text = std::string(text);
+  renderable.text = text;
   renderable.at = at;
   renderable.color = color;
   renderable.flags = flags;
