@@ -104,7 +104,7 @@ void RenderState::Render() {}
 
 void RenderLine(Vector2f from, Vector2f to, COLORREF color) {}
 void RenderWorldLine(Vector2f screenCenterWorldPosition, Vector2f from, Vector2f to, COLORREF color) {}
-void RenderText(const char* text, Vector2f at, TextColor color, int flags) {}
+void RenderText(const std::string& text, Vector2f at, TextColor color, int flags) {}
 
 #endif
 
